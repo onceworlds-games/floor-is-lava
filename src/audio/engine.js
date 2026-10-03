@@ -75,13 +75,17 @@ export class AudioEngine {
     return s;
   }
 
-  layer(name, build) {
+  layer(name, build, trim = 1) {
+    // Each layer: a trim (its place in the mix, measured offline) and a gain the night drives.
     const ctx = this.ctx;
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    gain.connect(this.master);
+    const t = ctx.createGain();
+    t.gain.value = trim;
+    gain.connect(t);
+    t.connect(this.master);
     const nodes = build(gain);
-    this.layers[name] = { gain, ...nodes };
+    this.layers[name] = { gain, target: -1, ...nodes };
     return this.layers[name];
   }
 
@@ -105,7 +109,7 @@ export class AudioEngine {
       bp.connect(out);
       src.start();
       return { bp };
-    });
+    }, 0.6);
     // Swell: low rumble that breathes.
     this.layer('swell', (out) => {
       const src = this.noiseSource();
@@ -126,7 +130,7 @@ export class AudioEngine {
       amp.connect(out);
       src.start();
       return {};
-    });
+    }, 0.5);
     // Rain: bright hiss.
     this.layer('rain', (out) => {
       const src = this.noiseSource();
@@ -137,7 +141,7 @@ export class AudioEngine {
       hp.connect(out);
       src.start();
       return {};
-    });
+    }, 0.7);
     // The lamp's motor: a low hum whose pitch follows the output.
     this.layer('motor', (out) => {
       const osc = ctx.createOscillator();
@@ -148,14 +152,14 @@ export class AudioEngine {
       osc2.frequency.value = 116.5;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 320;
+      lp.frequency.value = 240;
       osc.connect(lp);
       osc2.connect(lp);
       lp.connect(out);
       osc.start();
       osc2.start();
       return { osc, osc2, lp };
-    });
+    }, 0.16);
     // Generator: a chugging pulse.
     this.layer('gen', (out) => {
       const osc = ctx.createOscillator();
@@ -163,12 +167,12 @@ export class AudioEngine {
       osc.frequency.value = 38;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 200;
+      lp.frequency.value = 160;
       osc.connect(lp);
       lp.connect(out);
       osc.start();
       return {};
-    });
+    }, 0.3);
     // The pad: three detuned voices, swelling with danger, receding at dawn.
     this.layer('pad', (out) => {
       const voices = [];
@@ -210,7 +214,7 @@ export class AudioEngine {
         voices.push(o);
       }
       return { voices };
-    });
+    }, 0.42);
     // Radio: bandpassed static, with beeps and garbled syllables on calls.
     this.layer('static', (out) => {
       const src = this.noiseSource();
@@ -249,14 +253,14 @@ export class AudioEngine {
       ng.connect(out);
       src.start();
       return { voices };
-    });
+    }, 0.7);
     // The crank: a ratchet of clicks.
     this.layer('crank', (out) => {
       const src = this.noiseSource();
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.value = 1400;
-      bp.Q.value = 6;
+      bp.frequency.value = 1100;
+      bp.Q.value = 3;
       const amp = ctx.createGain();
       amp.gain.value = 0;
       const lfo = ctx.createOscillator();
@@ -272,14 +276,16 @@ export class AudioEngine {
       amp.connect(out);
       src.start();
       return {};
-    });
+    }, 4);
   }
 
   setLayer(name, value, time = 0.4) {
     const l = this.layers[name];
     if (!l) return;
-    const t = this.ctx.currentTime;
     const v = Math.max(0, Math.min(1.5, Number.isFinite(value) ? value : 0));
+    if (Math.abs(v - l.target) < 0.002) return; // unchanged: leave the ramp that is running
+    l.target = v;
+    const t = this.ctx.currentTime;
     l.gain.gain.cancelScheduledValues(t);
     l.gain.gain.setTargetAtTime(v, t, time);
   }
@@ -357,7 +363,7 @@ export class AudioEngine {
 
   // Named sounds. Each varies its pitch so no two in a row are the same.
   click() {
-    this.tone(this.vary('click', 1400, 0.15), { type: 'square', decay: 0.04, gain: 0.06 });
+    this.tone(this.vary('click', 1400, 0.15), { type: 'square', decay: 0.04, gain: 0.24, filter: 3200 });
   }
   thunk() {
     this.burst({ decay: 0.12, gain: 0.5, lp: 900 });
@@ -368,15 +374,15 @@ export class AudioEngine {
     this.tone(this.vary('flare', 900, 0.2), { type: 'sine', decay: 0.5, gain: 0.08, glide: 0.4 });
   }
   splash() {
-    this.burst({ decay: 0.5, gain: 0.3, bp: 700, q: 0.8 });
+    this.burst({ decay: 0.5, gain: 0.6, bp: 700, q: 0.8 });
   }
   bell(level = 50) {
     const base = level <= 10 ? 440 : level <= 25 ? 520 : 620;
     for (const [m, g] of [[1, 0.35], [2.76, 0.12], [5.4, 0.06]]) this.tone(base * m, { type: 'sine', decay: level <= 10 ? 2.2 : 1.4, gain: g });
   }
   coins() {
-    this.tone(this.vary('coin', 1800, 0.1), { type: 'triangle', decay: 0.18, gain: 0.12 });
-    setTimeout(() => this.tone(this.vary('coin', 2400, 0.1), { type: 'triangle', decay: 0.22, gain: 0.1 }), 70);
+    this.tone(this.vary('coin', 1800, 0.1), { type: 'triangle', decay: 0.18, gain: 0.4 });
+    setTimeout(() => this.tone(this.vary('coin', 2400, 0.1), { type: 'triangle', decay: 0.22, gain: 0.34 }), 70);
   }
   shipHorn() {
     this.tone(this.vary('ship', 196, 0.08), { type: 'sawtooth', attack: 0.2, decay: 0.9, gain: 0.12, filter: 500 });
@@ -397,40 +403,46 @@ export class AudioEngine {
     this.duck(delay, 2.5);
   }
   bark() {
-    for (let i = 0; i < 2; i++) setTimeout(() => this.burst({ decay: 0.12, gain: 0.35, bp: this.vary('bark', 650, 0.2), q: 2 }), i * 160);
+    // Two short barks: a falling growl of a tone under a puff of breath.
+    for (let i = 0; i < 2; i++) {
+      setTimeout(() => {
+        this.tone(this.vary('bark', 420, 0.12), { type: 'sawtooth', attack: 0.01, decay: 0.13, gain: 0.32, glide: 0.55, filter: 1400 });
+        this.burst({ decay: 0.1, gain: 0.5, bp: 900, q: 1.5 });
+      }, i * 190);
+    }
   }
   purr() {
-    this.burst({ decay: 1.2, gain: 0.2, bp: 90, q: 3 });
+    this.burst({ decay: 1.2, gain: 0.55, bp: 90, q: 3 });
   }
   gust() {
     this.burst({ decay: 1.5, gain: 0.25, bp: this.vary('gust', 700, 0.3), q: 0.5 });
   }
   radioBeep(ok) {
-    this.tone(ok ? 1100 : 500, { type: 'square', decay: 0.08, gain: 0.07 });
-    setTimeout(() => this.tone(ok ? 1500 : 400, { type: 'square', decay: 0.12, gain: 0.07 }), 120);
-    if (ok) for (let i = 0; i < 4; i++) setTimeout(() => this.burst({ decay: 0.09, gain: 0.18, bp: this.vary('voice', 900, 0.4), q: 4 }), 300 + i * 110);
+    this.tone(ok ? 1100 : 500, { type: 'square', decay: 0.08, gain: 0.32, filter: 2600 });
+    setTimeout(() => this.tone(ok ? 1500 : 400, { type: 'square', decay: 0.12, gain: 0.32, filter: 2600 }), 120);
+    if (ok) for (let i = 0; i < 4; i++) setTimeout(() => this.burst({ decay: 0.09, gain: 0.7, bp: this.vary('voice', 900, 0.4), q: 4 }), 300 + i * 110);
   }
   hail() {
-    for (let i = 0; i < 3; i++) setTimeout(() => this.tone(this.vary('morse', 1200, 0.05), { type: 'sine', decay: i === 1 ? 0.18 : 0.07, gain: 0.07 }), i * 170);
-    for (let i = 0; i < 5; i++) setTimeout(() => this.burst({ decay: 0.08, gain: 0.14, bp: this.vary('voice', 1000, 0.45), q: 5 }), 600 + i * 95);
+    for (let i = 0; i < 3; i++) setTimeout(() => this.tone(this.vary('morse', 1200, 0.05), { type: 'sine', decay: i === 1 ? 0.18 : 0.07, gain: 0.34 }), i * 170);
+    for (let i = 0; i < 5; i++) setTimeout(() => this.burst({ decay: 0.08, gain: 0.6, bp: this.vary('voice', 1000, 0.45), q: 5 }), 600 + i * 95);
   }
   stairs() {
-    this.burst({ decay: 0.1, gain: 0.18, bp: this.vary('step', 320, 0.3), q: 2 });
+    this.burst({ decay: 0.1, gain: 1.2, bp: this.vary('step', 320, 0.3), q: 2 });
   }
   swapLens() {
     this.tone(this.vary('swap', 240, 0.1), { type: 'triangle', decay: 0.9, gain: 0.12, glide: 2.0 });
   }
   wipe() {
-    this.burst({ decay: 0.6, gain: 0.2, bp: 2200, q: 1 });
+    this.burst({ decay: 0.6, gain: 0.45, bp: 2200, q: 1 });
   }
   strobeTick() {
     this.tone(this.vary('strobe', 3000, 0.2), { type: 'square', decay: 0.02, gain: 0.03 });
   }
   burn() {
-    this.burst({ decay: 0.4, gain: 0.25, bp: this.vary('burn', 1800, 0.3), q: 2 });
+    this.burst({ decay: 0.4, gain: 0.6, bp: this.vary('burn', 1800, 0.3), q: 2 });
   }
   scatter() {
-    this.burst({ decay: 0.5, gain: 0.3, bp: 500, q: 0.6 });
+    this.burst({ decay: 0.5, gain: 0.55, bp: 500, q: 0.6 });
   }
   door() {
     this.burst({ decay: 0.2, gain: 0.5, lp: 400 });
@@ -443,9 +455,9 @@ export class AudioEngine {
   /** A ship turns Guided: two soft bell notes a fifth apart, the second a breath later. */
   guided() {
     const f = this.vary('guided', 587, 0.03);
-    this.tone(f, { type: 'sine', decay: 0.5, gain: 0.07 });
-    this.tone(f * 2.76, { type: 'sine', decay: 0.25, gain: 0.015 });
-    setTimeout(() => this.tone(f * 1.5, { type: 'sine', decay: 0.7, gain: 0.07 }), 90);
+    this.tone(f, { type: 'sine', decay: 0.5, gain: 0.16 });
+    this.tone(f * 2.76, { type: 'sine', decay: 0.25, gain: 0.035 });
+    setTimeout(() => this.tone(f * 1.5, { type: 'sine', decay: 0.7, gain: 0.16 }), 90);
   }
   dawnBell() {
     for (let i = 0; i < 3; i++) setTimeout(() => this.bell(50), i * 900);
@@ -457,12 +469,12 @@ export class AudioEngine {
     for (const [i, f] of [330, 311, 294, 220].entries()) setTimeout(() => this.tone(f, { type: 'sine', decay: 1.0, gain: 0.15 }), i * 260);
   }
 
+  /** Thunder ducks the pad: the frame's mix multiplies it down for the length of the roll. */
   duck(delay, seconds) {
-    const l = this.layers.pad;
-    if (!l) return;
-    const t = this.ctx.currentTime + delay;
-    l.gain.gain.setTargetAtTime(0.02, t, 0.05);
-    l.gain.gain.setTargetAtTime(this.padLevel || 0, t + seconds, 0.8);
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.duckFrom = t + delay;
+    this.duckTo = t + delay + seconds;
   }
 
   /** Continuous mix from the night state, called every frame. */
@@ -502,7 +514,9 @@ export class AudioEngine {
     danger = Math.min(1, danger);
     this.danger += (danger - this.danger) * Math.min(1, dt * 0.5);
     this.padLevel = night ? 0.03 + this.danger * 0.14 : state.phase === 'dusk' ? 0.05 : 0;
-    this.setLayer('pad', this.padLevel, 1.5);
+    const now = this.ctx.currentTime;
+    const ducked = this.duckTo && now >= this.duckFrom && now < this.duckTo;
+    this.setLayer('pad', this.padLevel * (ducked ? 0.15 : 1), ducked ? 0.08 : 1.5);
     const pad = this.layers.pad;
     pad.voices[1].frequency.setTargetAtTime(82.4 + this.danger * 3, this.ctx.currentTime, 2);
     if (Math.random() < dt * (0.04 + storm * 0.1)) this.gust();
