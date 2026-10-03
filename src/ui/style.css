@@ -24,6 +24,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Screens: a full cover with one hero. */
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); text-align: center; }
 .screen.dark { background: radial-gradient(ellipse at 50% 45%, rgba(7, 12, 21, 0.25), rgba(7, 12, 21, 0.78)); }
+/* Pages start below the platform's buttons in the top-left corner. */
+.screen.dark, .screen.nightover.lost { padding-top: calc(62px + var(--sat)); }
 .screen.veil { background: linear-gradient(180deg, rgba(7, 12, 21, 0.2), rgba(7, 12, 21, 0.78)); }
 .screen.nightover { justify-content: flex-end; padding-bottom: calc(5vh + var(--sab)); background: linear-gradient(180deg, rgba(7, 12, 21, 0), rgba(7, 12, 21, 0) 35%, rgba(7, 12, 21, 0.62)); }
 .screen.nightover.lost { justify-content: center; background: radial-gradient(ellipse at 50% 45%, rgba(40, 8, 4, 0.35), rgba(7, 12, 21, 0.85)); }
@@ -146,6 +148,11 @@ button:focus-visible, .card:focus-visible { outline: 3px solid var(--amber); out
 .focus { position: absolute; right: calc(14px + var(--sar)); top: 40%; width: 44px; height: 160px; }
 .focus input { -webkit-appearance: none; appearance: none; width: 160px; height: 44px; transform: rotate(-90deg) translate(-58px, -58px); background: transparent; }
 .focus input::-webkit-slider-runnable-track { height: 8px; background: #4a3212; border-radius: 4px; }
+@media (max-height: 500px) {
+  /* A phone on its side: the slider moves to the left edge, under the platform's buttons and above the stick. */
+  .focus { top: calc(66px + var(--sat)); height: 120px; right: auto; left: calc(18px + var(--sal)); }
+  .focus input { width: 120px; transform: rotate(-90deg) translate(-38px, -38px); }
+}
 .focus input::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; margin-top: -12px; border-radius: 50%; background: var(--amber); border: 3px solid #150d04; }
 
 @media (max-width: 520px) {
