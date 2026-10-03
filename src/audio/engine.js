@@ -550,6 +550,15 @@ export class AudioEngine {
     }
   }
 
+  /** Between nights: a little wind, nothing else. */
+  idle(dt) {
+    if (!this.ready) return;
+    this.time += dt;
+    this.setLayer('wind', 0.1, 1);
+    this.setLayer('swell', 0.08, 1);
+    for (const name of ['rain', 'motor', 'gen', 'horn', 'crank', 'song', 'static', 'pad']) this.setLayer(name, 0, 0.5);
+  }
+
   ui() {
     this.click();
   }

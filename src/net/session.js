@@ -115,6 +115,9 @@ export class Session {
       }
     }));
     on('matchstart', () => this.onMatchStart());
+    on('match', () => {
+      if (this.isHost && this.state && room.match.phase !== 'lobby' && this.state.mid === room.match.id) this.seatCrew();
+    });
     on('matchend', () => this.onMatchEnd());
     on('matchpause', () => this.h.onToast?.('Waiting for players'));
     on('matchresume', () => {});
@@ -247,7 +250,7 @@ export class Session {
     const parts = room.participants || [];
     const taken = new Set(Object.values(st.stations).filter(Boolean));
     for (const p of parts) {
-      if (st.crew[p.id]) continue;
+      if (st.crew[p.id] || p.connected === false) continue;
       const want = p.presence && STATIONS.includes(p.presence.st) ? p.presence.st : null;
       const free = STATIONS.find((s) => !Object.values(st.crew).some((c) => c.st === s));
       addCrew(st, p.id, want && !taken.has(want) ? want : free || 'lantern');
@@ -260,6 +263,7 @@ export class Session {
     if (!this.isHost || !this.state) return;
     // Latecomers may take a seat during dusk; later they watch until the next night.
     if (this.state.phase === 'dusk') this.safe(() => this.room.admit([p.id]));
+    this.seatCrew();
     this.sendSnapshot(p.id);
   }
 
@@ -369,6 +373,13 @@ export class Session {
     if (ok) for (const fx of this.state.fx) this.h.onFx?.(fx, this.state);
     this.state.fx.length = 0;
     if (cmd.k === 'beam') this.localBeamUntil = now() + 400;
+    if (cmd.on === true) {
+      // A held verb: one message every 200 ms keeps the host's hold alive.
+      const t = now();
+      this.holdSent = this.holdSent || {};
+      if (this.holdSent[cmd.k] && t - this.holdSent[cmd.k] < 200) return ok;
+      this.holdSent[cmd.k] = t;
+    }
     this.safe(() => this.room.send({ t: 'cmd', c: cmd }, { to: this.room.host }));
     return ok;
   }
@@ -435,8 +446,8 @@ export class Session {
   closeNight() {
     if (!this.isHost || !this.state || !this.season) return;
     const ledger = endNight(this.season, this.state);
-    this.safe(() => this.room.setState('ledger', ledger));
     this.setSeason(this.season);
+    this.safe(() => this.room.setState('ledger', ledger));
     this.h.onLedger?.(ledger);
   }
 

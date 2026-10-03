@@ -261,6 +261,7 @@ async function boot() {
       submitScores(G.profile, season, score);
     }
     saveProfile(true);
+    screens.tab = 'ledger';
     G.phase = 'over';
     input.locked = true;
     controls.set(null);
@@ -332,6 +333,7 @@ async function boot() {
     if (!inNight) {
       if (!document.hidden) view.updateTitle(dt, null);
       hud.clear();
+      audio.idle(dt);
       if (session.awaitingSnapshot && screens.name !== 'waiting' && room.match.phase !== 'lobby') screens.waiting('Joining the night');
       return;
     }
