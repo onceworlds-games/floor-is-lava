@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Hints } from '../src/ui/hints.js';
+import { defaultProfile } from '../src/sim/profile.js';
+import { createNight, stepNight, addCrew } from '../src/sim/night.js';
+import { applyCommand } from '../src/sim/verbs.js';
+import { spawnShip } from '../src/sim/ships.js';
+import { BARE } from './helpers.mjs';
+
+test('the first night teaches in order, remembers what it said and stops after a few showings', () => {
+  const profile = defaultProfile();
+  const hints = new Hints(profile, false);
+  const st = createNight({ seed: 1, night: 1, season: BARE, weather: 'clear' });
+  addCrew(st, 'me', 'lantern');
+  applyCommand(st, { k: 'light' }, 'me');
+  for (let i = 0; i < 70; i++) stepNight(st);
+  const me = st.crew.me;
+  assert.equal(hints.update(st, me, 0.05), 'SPACE: SPOT');
+  assert.equal(new Hints(defaultProfile(), true).update(st, me, 0.05), 'MODE: SPOT');
+  applyCommand(st, { k: 'mode', mode: 'spot' }, 'me');
+  stepNight(st);
+  assert.equal(hints.update(st, me, 0.05), null, 'done hints go away');
+  spawnShip(st, { type: 'ferry', name: 'Test', d: 0 });
+  stepNight(st);
+  assert.equal(hints.update(st, me, 0.05), 'AIM AT THE SHIP');
+  assert.equal(profile.hints.spot, 1);
+  assert.equal(profile.hints.aim, 1);
+  // A hint times out after ten seconds, rests before it nags again, and never shows more than its allowance.
+  for (let i = 0; i < 12; i++) hints.update(st, me, 1);
+  assert.equal(hints.active, null);
+  assert.equal(profile.hints.aim, 1);
+  for (let i = 0; i < 25; i++) hints.update(st, me, 1);
+  assert.equal(profile.hints.aim, 2, 'it may come back after resting');
+  profile.hints.aim = 3;
+  hints.active = null;
+  hints.cool = {};
+  hints.update(st, me, 0.05);
+  assert.notEqual(hints.active?.id, 'aim');
+  hints.skip();
+  assert.equal(hints.update(st, me, 0.05), null);
+  assert.equal(profile.tutorial, true);
+});
