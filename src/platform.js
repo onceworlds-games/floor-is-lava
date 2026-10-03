@@ -157,7 +157,7 @@ function standalone() {
     badges: { award: async () => false, list: async () => [], has: async () => false },
     leaderboards: { submit: async () => null, top: async () => ({ entries: [], me: null }) },
     now: () => Date.now(),
-    controls: { set() {}, stick: { x: 0, y: 0 }, pressed: () => false, touch: false },
+    controls: { set() {}, stick: { x: 0, y: 0 }, pressed: () => false, touch: typeof location !== 'undefined' && /[?&]touch\b/.test(location.search) },
     ui: { setOrientation() {}, showInvite() {}, requestFullscreen() {}, setMenuPosition() {} },
     settings,
     rooms: {

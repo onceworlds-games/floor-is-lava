@@ -60,7 +60,7 @@ export class Tower {
     }
     const rail = this.mesh(paint(new THREE.TorusGeometry(gr + 0.2, 0.05, 6, 32), C.brass, C.brass), this.matSmooth);
     rail.rotation.x = Math.PI / 2;
-    rail.position.y = H - 0.3;
+    rail.position.y = H - 0.2;
     // The lamp room: glass drum with brass mullions, a dark roof and a finial.
     const glass = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 3.6, 24, 1, true), new THREE.MeshBasicMaterial({ color: C.glass, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false }));
     glass.position.y = H + 0.6;
@@ -80,8 +80,8 @@ export class Tower {
     innerRail.rotation.x = Math.PI / 2;
     innerRail.position.y = H - 0.2;
     // The lens: a brass pedestal, a glowing lamp, and five glass rings that turn.
-    const ped = this.mesh(cyl(0.4, 0.55, 1.0, 10, C.brassDark, C.brass));
-    ped.position.y = H - 0.6;
+    this.ped = this.mesh(cyl(0.4, 0.55, 1.0, 10, C.brassDark, C.brass));
+    this.ped.position.y = H - 0.6;
     this.lamp = new THREE.Mesh(paint(new THREE.SphereGeometry(0.22, 10, 8), C.amber), this.matGlow);
     this.lamp.position.y = H + 0.35;
     this.group.add(this.lamp);
@@ -210,7 +210,7 @@ export class Tower {
     const H = this.H;
     return {
       lantern: { y: H + 1.75, radius: -0.5, look: 'beam' },
-      gallery: { y: H + 0.1, radius: this.site.galleryRadius - 0.5, look: 'beam' },
+      gallery: { y: H + 0.25, radius: this.site.galleryRadius - 0.5, look: 'beam' },
       watch: { y: H - 6 + 1.6, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-0.5, 0, 0) },
       cellar: { y: 3.05, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-0.6, 0, 0) },
     };
@@ -237,7 +237,8 @@ export class Tower {
     this.lamp.material.uniforms.uEmissive.value = lampOn ? 0.9 : 0.1;
     if (this.housingHex !== housingHex) {
       this.housingHex = housingHex;
-      paint(this.lensRings[0].geometry, housingHex);
+      paint(this.ped.geometry, housingHex, housing === 'brass' ? C.brass : housingHex);
+      this.ped.geometry.attributes.color.needsUpdate = true;
     }
     if (crankOn) {
       this.crank.rotation.z += dt * 6;

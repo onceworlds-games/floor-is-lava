@@ -1,6 +1,6 @@
 // Boot: join the room first, then build the scene; then run the title, the day and the night.
 import './ui/style.css';
-import { ow, saves, now, player, controls, settings, onPlatformEvent, onPlatform } from './platform.js';
+import { ow, saves, now, player, controls, settings, onPlatformEvent, onPlatform, ui } from './platform.js';
 import { Session } from './net/session.js';
 import { View } from './render/view.js';
 import { Hud } from './ui/hud.js';
@@ -67,6 +67,7 @@ async function boot() {
       G.profile.cosmetics[kind] = id;
       saveProfile();
     },
+    invite: () => ui.showInvite(),
   });
 
   const me = await player.get();
@@ -162,7 +163,8 @@ async function boot() {
   function dayCtx() {
     const s = G.season;
     const today = new Date().toISOString().slice(0, 10);
-    return { season: s, profile: G.profile, isHost: session.isHost, ledger: G.ledger, firstDay: s.night === 1 && s.totals.nights === 0 && !s.over, best: G.profile.best.score, dailyDone: G.profile.daily.date === today && G.profile.daily.done };
+    const seats = Math.max(0, 4 - room.players.size);
+    return { season: s, profile: G.profile, isHost: session.isHost, ledger: G.ledger, firstDay: s.night === 1 && s.totals.nights === 0 && !s.over, best: G.profile.best.score, dailyDone: G.profile.daily.date === today && G.profile.daily.done, canInvite: onPlatform && seats > 0, seats };
   }
 
   function showDay() {
@@ -486,6 +488,7 @@ async function boot() {
   /** Drives the game through its public paths for the smoke test. */
   function autopilot() {
     let step = 0;
+    audio.start();
     const timer = setInterval(() => {
       try {
         step++;

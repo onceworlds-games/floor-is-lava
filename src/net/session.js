@@ -98,11 +98,12 @@ export class Session {
     this.speed = 1;
   }
 
-  async join() {
+  /** Joins the platform's room (or, for tests, whatever `makeRoom` returns). */
+  async join(makeRoom = null) {
     for (const u of this.unsub) u();
     this.unsub = [];
     this.closed = null;
-    const room = await ow.rooms.join(JOIN_OPTS);
+    const room = await (makeRoom ? makeRoom() : ow.rooms.join(JOIN_OPTS));
     this.room = room;
     this.me = room.me;
     this.joinedAt = now();
@@ -454,4 +455,4 @@ export class Session {
   }
 }
 
-export { onPlatform };
+export { onPlatform, pack, unpack };

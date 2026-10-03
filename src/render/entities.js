@@ -314,7 +314,7 @@ export class Entities {
       group.add(fog, cap);
       v.fog = fog;
     } else if (h.type === 'kraken' || h.type === 'titan') {
-      const segs = h.type === 'kraken' ? 9 : 7;
+      const segs = h.type === 'kraken' ? 12 : 7;
       const arms = h.type === 'kraken' ? 1 : 2;
       v.arms = [];
       for (let a = 0; a < arms; a++) {
@@ -412,7 +412,7 @@ export class Entities {
         v.fog.material.uniforms.uCentre.value.set(h.x, 0, h.z);
       } else if (h.type === 'kraken') {
         v.group.visible = !tell;
-        this.layArm(v.arms[0], h.x, h.z, 0, 8, 0, time, 3.2, storm, 1);
+        this.layArm(v.arms[0], h.x, h.z, 0, this.site.towerHeight - 7, 0, time, 3.6, storm, 1);
         if (tell) this.glow(h.x, this.waterY(h.x, h.z, storm) + 0.3, h.z, 0.5, 0.75, 0.7, 14 + 6 * Math.sin(time * 12));
       } else if (h.type === 'titan') {
         v.group.visible = !tell;

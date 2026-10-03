@@ -28,6 +28,7 @@ export class Gfx {
     this.post = this.makePost();
     this.target = null;
     this.flash = 0;
+    this.grain = true;
     canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       this.lost = true;
@@ -157,7 +158,7 @@ export class Gfx {
       u.uTime.value = time;
       u.uFlash.value = this.reducedMotion ? Math.min(flash, 0.25) : flash;
       u.uAspect.value = this.camera.aspect;
-      u.uGrain.value = this.quality === 'high' ? 0.04 : this.quality === 'medium' ? 0.03 : 0;
+      u.uGrain.value = !this.grain ? 0 : this.quality === 'high' ? 0.04 : this.quality === 'medium' ? 0.03 : 0;
       r.render(this.post.scene, this.post.cam);
     } else r.render(this.scene, this.camera);
   }

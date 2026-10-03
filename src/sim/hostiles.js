@@ -359,12 +359,12 @@ function stepTitan(state, h, dt, light, lit) {
     // Eyes: it only comes closer while unlit. Light it hard for 20 s in all.
     if (lit && light.I >= 1.5) h.lightAcc += dt;
     else h.z = Math.max(60, h.z - 1.5 * dt);
-    if (h.lightAcc >= 22) titanPhase(state, h, 2);
+    if (h.lightAcc >= 20) titanPhase(state, h, 2);
   } else if (h.phase === 2) {
     // Arms: six harpoon hits; it hammers the tower meanwhile.
     state.res.integ = Math.max(0, state.res.integ - 1.2 * dt);
     state.stats.damage += 1.2 * dt;
-    if (h.hit >= 7) titanPhase(state, h, 3);
+    if (h.hit >= 6) titanPhase(state, h, 3);
   } else if (h.phase === 3) {
     // Maw: three blasts of the horn and two flares on its lures.
     if (!h.lures.length) h.lures = [{ x: -40, z: 110, hit: 0 }, { x: 45, z: 120, hit: 0 }];

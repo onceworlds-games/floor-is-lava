@@ -85,7 +85,7 @@ export class Hud {
     const touch = controls.touch;
     const small = w < 520;
     const r = small ? 15 : 20;
-    const top = 14 + (small ? 44 : 50);
+    const top = small ? 92 : 64;
     // Dials along the top right: oil, power, heat, tower.
     const res = state.res;
     const dials = [

@@ -23,6 +23,47 @@ export function el(tag, cls = '', text = '') {
   return e;
 }
 
+/** A small keeper silhouette in the book's head, wearing the chosen hat. */
+function keeperFace(hat) {
+  const c = el('canvas');
+  c.width = c.height = 96;
+  c.style.cssText = 'width:48px;height:48px;flex:none';
+  const x = c.getContext('2d');
+  x.fillStyle = '#f0a63a';
+  x.beginPath();
+  x.arc(48, 40, 16, 0, Math.PI * 2);
+  x.fill();
+  x.beginPath();
+  x.moveTo(20, 96);
+  x.quadraticCurveTo(24, 58, 48, 58);
+  x.quadraticCurveTo(72, 58, 76, 96);
+  x.closePath();
+  x.fill();
+  x.fillStyle = '#35b6a6';
+  if (hat === 'souwester') {
+    x.beginPath();
+    x.moveTo(24, 36);
+    x.quadraticCurveTo(48, 10, 72, 36);
+    x.lineTo(78, 40);
+    x.lineTo(18, 40);
+    x.closePath();
+    x.fill();
+  } else if (hat === 'cap') {
+    x.fillRect(32, 22, 32, 10);
+    x.fillRect(32, 30, 44, 4);
+  } else if (hat === 'crown') {
+    x.beginPath();
+    for (let i = 0; i < 5; i++) {
+      x.lineTo(30 + i * 9, i % 2 ? 30 : 16);
+    }
+    x.lineTo(66, 30);
+    x.lineTo(30, 30);
+    x.closePath();
+    x.fill();
+  }
+  return c;
+}
+
 function button(label, cls, onClick, key = '') {
   const b = el('button', `btn ${cls}`.trim(), label);
   if (key) {
@@ -109,7 +150,10 @@ export class Screens {
     const head = el('div', 'head');
     const over = ctx.season.over;
     const title = over === 'won' ? 'Season kept' : over === 'lost' ? 'Season lost' : over === 'done' ? 'Daily watch' : ctx.season.night > LAST_NIGHT ? `Night ${ctx.season.night} · Endless` : `Day ${ctx.season.night}`;
-    head.append(el('h2', '', title));
+    const left = el('div');
+    left.style.cssText = 'display:flex;align-items:center;gap:12px';
+    left.append(keeperFace(ctx.profile.cosmetics.hat), el('h2', '', title));
+    head.append(left);
     head.append(el('span', 'coins', `${ctx.season.coins} coin`));
     book.append(head);
     const tabs = el('div', 'tabs');
@@ -231,6 +275,12 @@ export class Screens {
       const row = el('div', 'row');
       row.style.justifyContent = 'flex-start';
       row.append(button(ctx.dailyDone ? `Daily watch · best ${ctx.profile.daily.best}` : 'Daily watch', '', () => (this.click(), this.a.daily())));
+      box.append(row);
+    }
+    if (ctx.canInvite) {
+      const row = el('div', 'row');
+      row.style.justifyContent = 'flex-start';
+      row.append(button(`Invite · ${ctx.seats} seats free`, 'teal', () => (this.click(), this.a.invite())));
       box.append(row);
     }
     if (season.daily) box.append(el('div', 'line', `${KEEPERS[season.keeper].name} at ${SITES[season.site].name}. Best ${ctx.profile.daily.best}.`));

@@ -10,7 +10,7 @@ import { shipPosOf } from './night.js';
 import { reefAt } from './route.js';
 
 const SKILL = {
-  lazy: { period: 4, danger: 0.75, stations: ['lantern'], lens: false, strobe: false, gallery: false, watch: false, preempt: false, heat: false, oil: false, sticky: true },
+  lazy: { period: 4.5, danger: 0.8, stations: ['lantern'], lens: false, strobe: false, gallery: false, watch: false, preempt: false, heat: false, oil: false, sticky: true },
   basic: { period: 0.5, danger: 0.5, stations: ['lantern', 'watch'], lens: true, strobe: true, gallery: false, watch: true, preempt: true, heat: true, oil: false },
   expert: { period: 0.25, danger: 0.4, stations: ['lantern', 'gallery', 'watch', 'cellar'], lens: true, strobe: true, gallery: true, watch: true, preempt: true, heat: true, oil: true },
   sweep: { period: 0.5, danger: 0.5, stations: ['lantern', 'watch'], lens: true, strobe: true, gallery: false, watch: true, preempt: false, heat: true, oil: false, sweepOnly: true },
