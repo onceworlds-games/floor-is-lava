@@ -1,5 +1,8 @@
 // Store art, drawn by the game itself: ?poster=thumb1 | thumb2 | thumb3 | thumb4 | icon | badge-<id>.
-// Deterministic scenes with no SDK and no network; scripts/store.mjs captures them.
+// Deterministic scenes with no SDK and no network; scripts/store.mjs captures them. Each is a real night state
+// stepped by the simulation and drawn by the game's renderer; some are seen from a placed camera (a photo of
+// the tower) rather than through the keeper's eyes.
+import * as THREE from 'three';
 import { View } from './render/view.js';
 import { createNight, stepNight, addCrew, TICK, shipPosOf } from './sim/night.js';
 import { applyCommand } from './sim/verbs.js';
@@ -14,6 +17,9 @@ function nightFor(weather, night = 6) {
   addCrew(st, 'me', 'lantern');
   applyCommand(st, { k: 'light' }, 'me');
   stepNight(st);
+  // A clean stage: only what the picture places.
+  st.tl.events.length = 0;
+  st.nextEv = 0;
   return st;
 }
 
@@ -40,12 +46,12 @@ function stand(st, station) {
   st.stations[station] = 'me';
 }
 
-/** Puts a ship on the route so that it sits `dist` metres from the tower, near the aim azimuth. */
-function shipAt(st, type, name, dist, d = 4) {
+/** Puts a ship on the route so that it sits `dist` metres from the tower (on the first stretch that does). */
+function shipAt(st, type, name, dist, d = 4, from = 0) {
   const ship = spawnShip(st, { type, name, d });
-  let best = 0;
+  let best = from;
   let bd = Infinity;
-  for (let s = 0; s < st.route.L; s += 4) {
+  for (let s = from; s < st.route.L; s += 2) {
     ship.s = s;
     const p = shipPosOf(st, ship);
     const err = Math.abs(Math.hypot(p.x, p.z) - dist);
@@ -70,6 +76,9 @@ export async function runPoster(kind) {
     c.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px;`;
     document.body.append(c);
     document.body.style.background = 'transparent';
+    try {
+      await document.fonts?.load?.('900 40px Ledger');
+    } catch {}
     drawBadge(c.getContext('2d'), size, kind === 'icon' ? 'icon' : kind.slice(6));
     window.__posterReady = true;
     return;
@@ -78,44 +87,61 @@ export async function runPoster(kind) {
   view.gfx.setQuality('high');
   view.gfx.grain = false;
   view.setSite('skerry-rock');
+  const H = view.site.towerHeight;
   const input = { yaw: 0, pitch: -0.1 };
   let st;
-  let exterior = null;
+  let camera = null;
   let strikeAt = -1;
+  let strike = null;
+  let keep = () => {};
   if (kind === 'thumb1') {
-    // From the gallery in a squall: a ferry lit in the amber pool, a siren on her rock beside it, the Drowned climbing.
+    // The cover: out on the water by the reef, the beam comes down through the squall onto a ferry held in its
+    // pool; a siren sings on her rock in front of the light; the tower stands behind under lightning.
     st = nightFor('squall');
-    settle(st, 3);
-    const ferry = shipAt(st, 'ferry', 'Hesper', 62, 5);
+    const ferry = shipAt(st, 'ferry', 'Hesper', 82, 3);
     ferry.guided = 6;
-    const smack = shipAt(st, 'smack', 'Petrel', 150, -5);
-    smack.seen = 1;
     const p = shipPosOf(st, ferry);
+    const smack = shipAt(st, 'smack', 'Petrel', 215, -4);
+    smack.seen = 1;
+    const dist = Math.hypot(p.x, p.z);
+    const u = { x: p.x / dist, z: p.z / dist };
+    const side = { x: u.z, z: -u.x };
     const siren = spawnHostile(st, { type: 'siren', u: 0.5, side: 1, tell: 0 });
     siren.st = 'sing';
-    siren.x = p.x + 22;
-    siren.z = p.z + 6;
-    const dr = spawnHostile(st, { type: 'drowned', n: 3, tell: 0 });
-    dr.st = 'climb';
-    dr.p = 0.25;
-    dr.x = p.x - 30;
-    dr.z = p.z - 14;
-    spot(st, p.x, p.z, 22, 'amber');
+    siren.x = p.x + u.x * 17 - side.x * 13;
+    siren.z = p.z + u.z * 17 - side.z * 13;
+    spot(st, p.x, p.z, 18, 'amber');
     stand(st, 'lantern');
-    input.pitch = -0.24;
+    camera = {
+      pos: new THREE.Vector3(p.x + u.x * 46 - side.x * 30, 11, p.z + u.z * 46 - side.z * 30),
+      target: new THREE.Vector3(p.x * 0.45 - side.x * 4, 15, p.z * 0.45 - side.z * 4),
+      fov: 50,
+    };
+    strike = { x: -u.x * 150 + side.x * 120, z: -u.z * 150 + side.z * 120 };
+    strikeAt = 47;
+    keep = () => {
+      ferry.guided = 6;
+      siren.silenced = 0;
+      siren.scared = 0;
+      siren.st = 'sing';
+    };
   } else if (kind === 'thumb2') {
-    // Lightning over the tower, from the sea: the lamp room glowing, the beam out over the water.
+    // Lightning over the tower, from the sea: the lamp room glowing, the beam out over the water on a barge.
     st = nightFor('thunder', 8);
-    settle(st, 2);
-    const barge = shipAt(st, 'barge', 'Carrack Moll', 150, 2);
+    const barge = shipAt(st, 'barge', 'Carrack Moll', 120, 2);
     const p = shipPosOf(st, barge);
-    spot(st, p.x, p.z, 18, 'white');
-    exterior = { x: 70, y: 10, z: 60 };
-    strikeAt = 44;
+    spot(st, p.x, p.z, 16, 'white');
+    stand(st, 'lantern');
+    const a = Math.atan2(p.x, p.z) - 2.15;
+    camera = { pos: new THREE.Vector3(Math.sin(a) * 105, 6, Math.cos(a) * 105), target: new THREE.Vector3(Math.sin(a + 0.5) * 20, H * 0.75, Math.cos(a + 0.5) * 20) };
+    strike = { x: -Math.sin(a) * 120 + Math.cos(a) * 40, z: -Math.cos(a) * 120 - Math.sin(a) * 40 };
+    strikeAt = 49;
+    keep = () => {
+      barge.guided = 6;
+    };
   } else if (kind === 'thumb3') {
     // The Kraken on the tower, the hard white pool on it, a harpoon streaking down from the gallery.
     st = nightFor('gale', 9);
-    settle(st, 2);
     const k = spawnHostile(st, { type: 'kraken', tell: 0 });
     k.st = 'grip';
     k.x = 14;
@@ -126,42 +152,44 @@ export async function runPoster(kind) {
     stand(st, 'gallery');
     input.pitch = -0.55;
     input.yaw = 0.1;
+    strikeAt = 30;
+    strike = { x: 120, z: 180 };
+    keep = () => {
+      k.life = 40;
+      for (const sh of st.shots) sh.life = 0.3;
+    };
   } else {
-    // The watch room: the chart table in the lamplight, the cat on the chart, fog on the water outside.
-    st = nightFor('fog', 7);
-    settle(st, 2);
-    const w = spawnHostile(st, { type: 'wraith', u: 0.45, tell: 0 });
-    w.st = 'move';
-    const m = spawnHostile(st, { type: 'mimic', u: 0.6, side: -1, tell: 0 });
-    m.st = 'halted';
-    m.revealed = 1;
-    shipAt(st, 'ferry', 'Lisbet', 130, -6);
-    spot(st, m.x, m.z, 12, 'blue');
-    stand(st, 'watch');
-    input.pitch = 0;
-    input.yaw = -0.25;
+    // Dawn: the storm spent, the lamp still burning, ships coming home through gold water.
+    st = nightFor('rain', 7);
+    const a = shipAt(st, 'ferry', 'Lisbet', 150, -3, 200);
+    const b = shipAt(st, 'barge', 'Marram', 105, 4, 200);
+    shipAt(st, 'smack', 'Tern', 70, 2, 200);
+    a.guided = 6;
+    b.guided = 6;
+    st.weather = { ...st.weather, rain: 0, storm: 0.25, fog: 0.15, vis: 0.85 };
+    st.phase = 'dawn';
+    st.dawnLeft = 0.01;
+    const bp = shipPosOf(st, b);
+    spot(st, bp.x, bp.z, 26, 'amber');
+    stand(st, 'lantern');
+    view.dawn = 1;
+    camera = { pos: new THREE.Vector3(-30, H + 4, 26), target: new THREE.Vector3(bp.x * 0.8, 2, bp.z * 0.8) };
+    keep = () => {
+      st.phase = 'dawn';
+      st.dawnLeft = 0.01;
+    };
   }
+  settle(st, 0.2);
   let frames = 0;
   function frame() {
     const dt = 1 / 30;
     stepNight(st, TICK);
     for (const h of st.hostiles) {
       if (h.type === 'drowned') h.p = Math.min(h.p, 0.5);
-      if (h.type === 'siren') h.silenced = 0;
-      if (h.type === 'kraken') h.life = 40;
     }
-    for (const sh of st.shots) sh.life = 0.3;
-    if (exterior) {
-      // Not a station: the camera stands off the rock, looking at the lamp room.
-      view.update(st, null, input, dt, { reducedMotion: true });
-      const a = Math.atan2(exterior.x, exterior.z);
-      view.camera.position.set(exterior.x, exterior.y, exterior.z);
-      view.camera.lookAt(Math.sin(a) * 8, st.mods.towerHeight * 0.6, Math.cos(a) * 8);
-      if (frames === strikeAt) view.weather.strike(-30, -40, true);
-      view.weather.update(dt, view.camera, st.weather, false, false);
-      if (frames > strikeAt) view.weather.flash = Math.min(view.weather.flash, 0.22);
-      view.gfx.render(frames / 30, view.weather.flash);
-    } else view.update(st, st.crew.me, input, dt, { reducedMotion: true, cosmetics: { collar: 'red', housing: 'brass' } });
+    keep();
+    if (frames === strikeAt && strike) view.weather.strike(strike.x, strike.z, false, view.camera);
+    view.update(st, st.crew.me, input, dt, { reducedMotion: false, camera, cosmetics: { collar: 'red', housing: 'brass' } });
     frames++;
     if (frames === 52) window.__posterReady = true;
     if (frames < 52) requestAnimationFrame(frame);

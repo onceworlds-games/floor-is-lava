@@ -1,5 +1,7 @@
-// The sky dome: dusk to night gradient, two layers of scrolling cloud noise, stars where the sky is
-// clear, a moon, lightning flashes and the dawn.
+// The sky dome, in linear light: a near-black zenith over a horizon haze that matches the sea's fog (so the sea's
+// edge disappears), two layers of cloud with silver edges toward the moon and dark bellies, the beam catching the
+// low cloud along its heading, lightning lighting the cloud from inside around the bolt, a dusk ember in the west
+// and a dawn that warms the whole bowl.
 import * as THREE from 'three';
 import { LIGHT, NOISE } from './shaders.js';
 
@@ -13,35 +15,58 @@ precision highp float;
 ${NOISE}
 varying vec3 vDir;
 uniform float uTime; uniform float uFlash; uniform float uStorm; uniform float uDawn; uniform float uDusk; uniform vec3 uMoon; uniform float uClouds;
-uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uDuskCol;
+uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uDuskCol; uniform vec3 uFogColor; uniform vec4 uBeamDir; uniform vec3 uLens; uniform vec3 uFlashPos;
+uniform vec3 uCamera;
+float clouds(vec2 cp) {
+  float c1 = fbm(cp * 1.4 + vec2(uTime * 0.010, uTime * 0.004));
+  float c2 = fbm(cp * 3.1 + vec2(-uTime * 0.018, uTime * 0.008) + 7.0);
+  return c1 * 0.68 + c2 * 0.32;
+}
 void main() {
   vec3 d = normalize(vDir);
-  float h = clamp(d.y, -0.1, 1.0);
-  vec3 col = mix(uHorizon, uZenith, pow(h, 0.55));
-  // Dusk: a warm band low in the west that fades as the night settles.
-  float west = max(0.0, -d.x) * (1.0 - smoothstep(0.0, 0.35, h));
-  col = mix(col, uDuskCol, uDusk * west * 0.9);
-  // Stars.
+  float h = clamp(d.y, -0.2, 1.0);
+  // The bowl: haze at the horizon (the fog's own colour, so the sea melts into it), dark at the top.
+  vec3 col = mix(uFogColor * 1.15, uZenith, smoothstep(0.0, 0.42, h));
+  col = mix(uFogColor, col, smoothstep(-0.05, 0.03, h));
+  // Dusk: an ember low in the west that fades as the night settles.
+  float west = pow(max(0.0, -d.x * 0.8 - d.z * 0.2), 1.5) * (1.0 - smoothstep(0.0, 0.3, h));
+  col += uDuskCol * uDusk * west * 0.9;
+  // Stars, where the sky is open.
   vec2 sp = d.xz / (d.y + 0.25) * 90.0;
-  float st = step(0.9975, hash12(floor(sp))) * smoothstep(0.02, 0.3, h);
-  float twinkle = 0.6 + 0.4 * sin(uTime * 3.0 + hash12(floor(sp) + 1.0) * 30.0);
-  // Clouds: two scrolling layers, thicker in a storm, lit faintly by the moon.
-  vec2 cp = d.xz / (d.y + 0.2);
-  float c1 = fbm(cp * 1.6 + vec2(uTime * 0.012, uTime * 0.004));
-  float c2 = fbm(cp * 3.2 + vec2(-uTime * 0.02, uTime * 0.01) + 7.0);
-  float cover = smoothstep(0.42 - uStorm * 0.25 - uClouds * 0.1, 0.75 - uStorm * 0.1, c1 * 0.7 + c2 * 0.3) * smoothstep(-0.02, 0.12, h);
-  float lit = max(0.0, dot(d, uMoon));
-  vec3 cloud = mix(vec3(0.05, 0.07, 0.1), vec3(0.17, 0.2, 0.26), lit * 0.8) * (1.0 - uStorm * 0.4);
-  col += st * twinkle * (1.0 - cover) * vec3(0.8, 0.9, 1.0);
-  // The moon.
+  float st = step(0.9972, hash12(floor(sp))) * smoothstep(0.05, 0.35, h);
+  float twinkle = 0.5 + 0.5 * sin(uTime * 3.0 + hash12(floor(sp) + 1.0) * 30.0);
+  // Clouds: thicker in a storm; lit at their edges toward the moon, dark in their bellies.
+  vec2 cp = d.xz / (d.y + 0.18);
+  float c = clouds(cp);
+  float cover = smoothstep(0.46 - uStorm * 0.3 - uClouds * 0.12, 0.78 - uStorm * 0.12, c) * smoothstep(-0.03, 0.14, h);
+  vec2 toMoon = normalize(uMoon.xz / (uMoon.y + 0.18) - cp + 1e-4);
+  float edge = clamp((c - clouds(cp + toMoon * 0.06)) * 6.0, 0.0, 1.0);
+  float moonNear = pow(max(0.0, dot(d, uMoon)), 6.0);
+  vec3 belly = vec3(0.004, 0.006, 0.010) * (1.0 + uStorm);
+  vec3 lit = vec3(0.03, 0.042, 0.06) * (1.0 - uStorm * 0.55);
+  vec3 cloudCol = belly + lit * (0.25 + edge * 1.6) * (0.25 + moonNear * 2.2);
+  col += st * twinkle * (1.0 - cover) * vec3(0.5, 0.6, 0.75) * 0.6;
+  // The moon behind its halo, hidden by the cloud.
   float md = distance(d, uMoon);
-  float moon = smoothstep(0.03, 0.022, md);
-  float halo = (1.0 - smoothstep(0.02, 0.25, md)) * 0.18;
-  col += (moon * vec3(0.9, 0.95, 1.0) + halo * vec3(0.5, 0.65, 0.85)) * (1.0 - cover * 0.9);
-  col = mix(col, cloud, cover);
-  // Lightning: the whole sky goes white-blue for a heartbeat; the dawn warms the horizon.
-  col += uFlash * vec3(0.75, 0.85, 1.0) * (0.6 + 0.4 * cover);
-  col = mix(col, mix(vec3(0.95, 0.6, 0.35), uZenith * 3.0, pow(h, 0.5)), uDawn);
+  float disc = smoothstep(0.028, 0.02, md);
+  float halo = (1.0 - smoothstep(0.02, 0.45, md));
+  col += (disc * vec3(1.6, 1.7, 1.8) + halo * halo * vec3(0.10, 0.14, 0.2)) * (1.0 - cover * 0.92) * (1.0 - 0.7 * uStorm);
+  col = mix(col, cloudCol, cover);
+  // The beam in the low cloud and the haze along its heading: a pale wash where the light runs out to sea.
+  if (uBeamDir.w > 0.0) {
+    vec2 bd = uBeamDir.xy;
+    float along = max(0.0, dot(normalize(d.xz + 1e-4), bd));
+    float low = 1.0 - smoothstep(-0.02, 0.22, h - uBeamDir.z);
+    col += uLens * uBeamDir.w * pow(along, 60.0) * low * (0.02 + cover * 0.1);
+  }
+  // Lightning: the cloud glows from inside around the bolt, and the whole bowl flashes for a heartbeat.
+  float near = pow(max(0.0, dot(d, normalize(uFlashPos - uCamera))), 6.0);
+  col += uFlash * vec3(0.55, 0.7, 1.0) * ((0.25 + 0.75 * cover) * 0.22 + near * (0.6 + 1.6 * cover) * 1.3);
+  // Dawn: amber at the horizon in the east, pale above; the clouds' bellies catch the gold.
+  float east = 0.6 + 0.4 * max(0.0, d.x);
+  vec3 dawn = mix(vec3(1.0, 0.5, 0.26) * 0.9 * east, vec3(0.16, 0.22, 0.34), smoothstep(0.0, 0.5, h));
+  dawn = mix(dawn, vec3(1.0, 0.62, 0.42) * (0.35 + edge * 0.8), cover * 0.75);
+  col = mix(col, dawn, uDawn);
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -50,18 +75,19 @@ export class Sky {
   constructor(scene) {
     this.material = new THREE.ShaderMaterial({
       uniforms: {
-        uTime: LIGHT.uTime, uFlash: LIGHT.uFlash, uStorm: LIGHT.uStorm, uDawn: LIGHT.uDawn, uMoon: LIGHT.uMoon,
+        uTime: LIGHT.uTime, uFlash: LIGHT.uFlash, uStorm: LIGHT.uStorm, uDawn: LIGHT.uDawn, uMoon: LIGHT.uMoon, uFogColor: LIGHT.uFogColor,
+        uBeamDir: LIGHT.uBeamDir, uLens: LIGHT.uLens, uFlashPos: LIGHT.uFlashPos, uCamera: LIGHT.uCamera,
         uDusk: { value: 0 }, uClouds: { value: 0 },
-        uZenith: { value: new THREE.Color(0x05080f) },
+        uZenith: { value: new THREE.Color(0x02040a) },
         uHorizon: { value: new THREE.Color(0x14303a) },
-        uDuskCol: { value: new THREE.Color(0x7a3a16) },
+        uDuskCol: { value: new THREE.Color(0xa0461a) },
       },
       vertexShader: VERT,
       fragmentShader: FRAG,
       side: THREE.BackSide,
       depthWrite: false,
     });
-    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1100, 32, 18), this.material);
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1200, 48, 24), this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -10;
     scene.add(this.mesh);

@@ -23,13 +23,24 @@ export function el(tag, cls = '', text = '') {
   return e;
 }
 
-/** A small keeper silhouette in the book's head, wearing the chosen hat. */
+/** The keeper's portrait pasted in the ledger: an ink silhouette in an oval, wearing the chosen hat. */
 function keeperFace(hat) {
   const c = el('canvas');
   c.width = c.height = 96;
-  c.style.cssText = 'width:48px;height:48px;flex:none';
+  c.className = 'portrait';
   const x = c.getContext('2d');
-  x.fillStyle = '#f0a63a';
+  x.fillStyle = '#e4d6b4';
+  x.beginPath();
+  x.ellipse(48, 48, 40, 46, 0, 0, Math.PI * 2);
+  x.fill();
+  x.lineWidth = 4;
+  x.strokeStyle = '#2a1d10';
+  x.stroke();
+  x.save();
+  x.beginPath();
+  x.ellipse(48, 48, 38, 44, 0, 0, Math.PI * 2);
+  x.clip();
+  x.fillStyle = '#2a1d10';
   x.beginPath();
   x.arc(48, 40, 16, 0, Math.PI * 2);
   x.fill();
@@ -39,7 +50,7 @@ function keeperFace(hat) {
   x.quadraticCurveTo(72, 58, 76, 96);
   x.closePath();
   x.fill();
-  x.fillStyle = '#35b6a6';
+  x.fillStyle = '#a3321f';
   if (hat === 'souwester') {
     x.beginPath();
     x.moveTo(24, 36);
@@ -61,6 +72,7 @@ function keeperFace(hat) {
     x.closePath();
     x.fill();
   }
+  x.restore();
   return c;
 }
 
@@ -111,18 +123,20 @@ export class Screens {
   }
 
   // ---- Title and the continue card
+  // The title is the storm itself (the view draws it behind): the name above, one button below.
   title(hasSeason, onPlay) {
-    const s = el('div', 'screen veil');
-    s.append(el('h1', '', 'Watchlight'));
-    s.append(el('div', 'sub', 'Keep the light'));
-    const b = el('button', 'big', hasSeason ? 'Continue' : 'Keep the light');
+    const s = el('div', 'screen title');
+    s.append(el('h1', 'wordmark', 'Watchlight'));
+    const b = el('button', 'big play', 'Play');
     b.addEventListener('click', () => {
       this.click();
       onPlay();
     });
     s.append(b);
     this.show('title', s);
-    b.focus();
+    try {
+      b.focus({ preventScroll: true });
+    } catch {}
   }
 
   continueCard(season, { onContinue, onNew }) {
@@ -154,7 +168,7 @@ export class Screens {
     left.style.cssText = 'display:flex;align-items:center;gap:12px';
     left.append(keeperFace(ctx.profile.cosmetics.hat), el('h2', '', title));
     head.append(left);
-    head.append(el('span', 'coins', `${ctx.season.coins} coin`));
+    head.append(el('span', 'coins purse', `${ctx.season.coins}`));
     book.append(head);
     const tabs = el('div', 'tabs');
     const names = [];
@@ -304,7 +318,7 @@ export class Screens {
         if (this.a.buy(item.id)) {
           this.click();
           render();
-          this.current.querySelector('.coins').textContent = `${season.coins} coin`;
+          this.current.querySelector('.coins').textContent = `${season.coins}`;
         }
       });
       grid.append(card);

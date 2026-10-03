@@ -2,7 +2,27 @@
 // chart table, the cellar, and the stairwell between them. Everything is painted into vertex colours
 // and lit by the shared world material.
 import * as THREE from 'three';
-import { worldMaterial, paint, LIGHT } from './shaders.js';
+import { worldMaterial, paint, LIGHT, NOISE } from './shaders.js';
+
+// The lamp room's glass: nearly nothing head-on, a cold sheen at a slant, and in rain the drops that run down it,
+// lit by the beam. Added light only, so it never greys the night behind it.
+const GLASS_VERT = /* glsl */ `varying vec3 vWorld; varying vec3 vNormal; varying vec2 vUv;
+void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vNormal = normalize(mat3(modelMatrix) * normal); vUv = uv; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const GLASS_FRAG = /* glsl */ `precision highp float; ${NOISE}
+varying vec3 vWorld; varying vec3 vNormal; varying vec2 vUv;
+uniform vec3 uCamera; uniform float uTime; uniform float uRain; uniform float uPoolI; uniform vec3 uLens; uniform float uFlash;
+void main() {
+  vec3 toCam = normalize(uCamera - vWorld);
+  float f = pow(1.0 - abs(dot(normalize(vNormal), toCam)), 4.0);
+  vec2 g = vUv * vec2(110.0, 16.0);
+  vec2 cell = floor(g);
+  vec2 fr = fract(g);
+  float h = hash12(cell);
+  float y = 1.0 - fract(h * 7.0 + uTime * (0.04 + h * 0.1));
+  float drop = smoothstep(0.12, 0.0, length((fr - vec2(0.5, y)) * vec2(1.0, 2.6))) * step(0.78, h) * uRain;
+  vec3 col = vec3(0.45, 0.6, 0.7) * f * 0.02 + mix(vec3(0.5, 0.62, 0.72), uLens, 0.6) * drop * (0.006 + uPoolI * 0.02 + uFlash * 0.25);
+  gl_FragColor = vec4(col, 1.0);
+}`;
 import { glowTexture } from './beam.js';
 
 export const C = { cream: 0xe8dcc4, teal: 0x1f7f78, deep: 0x0e2234, brass: 0xb8832e, brassDark: 0x7a4f16, iron: 0x2a2f36, wood: 0x3a2614, stone: 0x3b3f44, stoneDark: 0x24282d, glass: 0x9fd9d2, amber: 0xf0a63a };
@@ -62,7 +82,9 @@ export class Tower {
     rail.rotation.x = Math.PI / 2;
     rail.position.y = H - 0.2;
     // The lamp room: glass drum with brass mullions, a dark roof and a finial.
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 3.6, 24, 1, true), new THREE.MeshBasicMaterial({ color: C.glass, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false }));
+    this.glassMat = new THREE.ShaderMaterial({ uniforms: { uCamera: LIGHT.uCamera, uTime: LIGHT.uTime, uRain: { value: 0 }, uPoolI: LIGHT.uPoolI, uLens: LIGHT.uLens, uFlash: LIGHT.uFlash }, vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 3.6, 32, 1, true), this.glassMat);
+    glass.renderOrder = 4;
     glass.position.y = H + 0.6;
     this.group.add(glass);
     for (let i = 0; i < 10; i++) {
@@ -138,7 +160,8 @@ export class Tower {
     this.chartCanvas.width = this.chartCanvas.height = 256;
     this.chartTex = new THREE.CanvasTexture(this.chartCanvas);
     this.chartTex.colorSpace = THREE.SRGBColorSpace;
-    this.chartMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.0), new THREE.MeshBasicMaterial({ map: this.chartTex }));
+    // Paper under a lamp, not a screen: the chart sits in the room's light.
+    this.chartMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.0), new THREE.MeshBasicMaterial({ map: this.chartTex, color: 0x6f6a62 }));
     this.chartMesh.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
     this.chartMesh.position.set(1.5, wy + 0.91, 0);
     this.group.add(this.chartMesh);
@@ -216,7 +239,8 @@ export class Tower {
     };
   }
 
-  update(dt, beam, time, { lampOn = true, crankOn = false, hornOn = false, doorAttack = false, cat = false, collar = 'red', needle = 0, cansLeft = 1, crateTaken = false, housing = 'brass' } = {}) {
+  update(dt, beam, time, { lampOn = true, crankOn = false, hornOn = false, doorAttack = false, cat = false, collar = 'red', needle = 0, cansLeft = 1, crateTaken = false, housing = 'brass', rain = 0 } = {}) {
+    this.glassMat.uniforms.uRain.value = rain;
     // The lens turns with the beam in Spot, by itself in Sweep.
     const az = beam.mode === 'sweep' ? beam.sweepAz : beam.az;
     this.lensGroup.rotation.y = Math.PI - az;
@@ -230,7 +254,9 @@ export class Tower {
     this.eye.material.opacity = 0.45 * glow;
     this.lensRings[0].material.opacity = 0.2 + 0.2 * glow;
     const cam = LIGHT.uCamera.value;
-    if (cam.y < 5.5) LIGHT.uLamp.value.set(2.2, 4.6, 0.8, 3.2);
+    // The room's own lamp lights whichever room the eye is in; seen from outside, only the lamp room glows.
+    if (Math.hypot(cam.x, cam.z) > 6) LIGHT.uLamp.value.set(0, this.H + 0.35, 0, lampOn ? 0.7 : 0.1);
+    else if (cam.y < 5.5) LIGHT.uLamp.value.set(2.2, 4.6, 0.8, 3.2);
     else if (cam.y < this.H - 2) LIGHT.uLamp.value.set(0.6, this.H - 6 + 2.9, 0, 2.2);
     else LIGHT.uLamp.value.set(0, this.H + 0.35, 0, lampOn ? 1.1 : 0.2);
     const housingHex = housing === 'iron' ? C.iron : housing === 'teal' ? C.teal : housing === 'copper' ? 0xb0542a : C.brass;

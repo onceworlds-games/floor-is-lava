@@ -6,23 +6,46 @@ import { glowTexture } from './beam.js';
 import { reefPoints, routeAt, shipPos } from '../sim/route.js';
 import { SHIPS } from '../sim/data/ships.js';
 
-const MAX_GLOWS = 400;
+const MAX_GLOWS = 700;
 
-function hull(len, beam, height, hex, deckHex) {
-  // A low-poly hull: a tapered box with a pointed bow, painted dark with a lighter deck.
-  const g = new THREE.BoxGeometry(len, height, beam, 3, 1, 1);
+const HULL_COLOURS = {
+  smack: { top: 0x223127, deck: 0x6b5a44 },
+  skiff: { top: 0x2b2420, deck: 0x6b5a44 },
+  ferry: { top: 0x1b3450, deck: 0x8d8574 },
+  barge: { top: 0x5a2e1c, deck: 0x4b4640 },
+  cutter: { top: 0x3c454e, deck: 0x5a636c },
+};
+
+function hull(len, beam, height, type) {
+  // A low-poly hull: pointed bow, a sheer that rises to it, a rounded stern. Painted by face: an antifouling red
+  // below the waterline, the ship's own colour above, a lighter deck.
+  const g = new THREE.BoxGeometry(len, height, beam, 6, 2, 1).toNonIndexed();
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i);
     const y = p.getY(i);
     const z = p.getZ(i);
-    const t = (x / len + 0.5); // 0 stern, 1 bow
-    const taper = t > 0.66 ? 1 - (t - 0.66) / 0.34 * 0.85 : t < 0.2 ? 0.8 + t : 1;
-    p.setZ(i, z * taper * (y < 0 ? 0.6 : 1));
-    if (y < 0) p.setY(i, y * 0.7);
+    const t = x / len + 0.5; // 0 stern, 1 bow
+    const taper = t > 0.62 ? 1 - ((t - 0.62) / 0.38) ** 1.4 * 0.92 : t < 0.18 ? 0.78 + t * 1.2 : 1;
+    p.setZ(i, z * taper * (y < 0 ? 0.62 : 1));
+    const sheer = y > 0 ? (t > 0.6 ? (t - 0.6) * height * 1.1 : 0) : 0;
+    p.setY(i, (y < 0 ? y * 0.75 : y) + sheer);
   }
   g.computeVertexNormals();
-  paint(g, hex, deckHex);
+  const c = HULL_COLOURS[type] || HULL_COLOURS.smack;
+  const cols = new Float32Array(p.count * 3);
+  const deck = new THREE.Color(c.deck);
+  const top = new THREE.Color(c.top);
+  const bottom = new THREE.Color(0x4a1f17);
+  const n = g.attributes.normal;
+  for (let i = 0; i < p.count; i += 3) {
+    // One colour per triangle (flat shading reads cleanly at a distance).
+    const ny = (n.getY(i) + n.getY(i + 1) + n.getY(i + 2)) / 3;
+    const y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3;
+    const col = ny > 0.6 ? deck : y < -height * 0.12 ? bottom : top;
+    for (let k = 0; k < 3; k++) cols.set([col.r, col.g, col.b], (i + k) * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   return g;
 }
 
@@ -36,23 +59,34 @@ function shipGeometry(type) {
   const def = SHIPS[type] || SHIPS.smack;
   const L = def.length;
   const W = L * 0.3;
-  add(hull(L, W, L * 0.12, 0x2a1e14, 0x7a6248), 0, 0, 0);
+  add(hull(L, W, L * 0.12, type), 0, 0, 0);
+  const mast = (x, h, top = 0x3a2614) => add(paint(new THREE.CylinderGeometry(0.06, 0.09, h, 5), 0x2a2018, top), x, L * 0.08 + h / 2, 0);
   if (type === 'smack' || type === 'skiff') {
-    add(paint(new THREE.BoxGeometry(0.15, L * 0.9, 0.15), 0x3a2614), 0.5, L * 0.45, 0);
-    const sail = paint(new THREE.BoxGeometry(L * 0.45, L * 0.55, 0.06), 0xd9cdb4, 0xbfb094);
-    add(sail, -L * 0.1, L * 0.5, 0);
-    add(paint(new THREE.BoxGeometry(L * 0.3, L * 0.14, W * 0.7), 0x5a4330, 0x8a7258), -L * 0.25, L * 0.12, 0);
+    mast(L * 0.08, L * 0.85);
+    // A tanned sail, a little bellied: two triangles on the mast.
+    const sail = new THREE.BufferGeometry();
+    const h = L * 0.75;
+    sail.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -L * 0.42, 0, 0.25, 0, h, 0, 0, 0, 0, 0, h, 0, -L * 0.42, 0, 0.25], 3));
+    sail.computeVertexNormals();
+    paint(sail, 0x7a4a2a, 0xa0683c);
+    add(sail, L * 0.06, L * 0.12, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.24, L * 0.13, W * 0.62), 0x4a3a2a, 0x6b5640), -L * 0.26, L * 0.12, 0);
   } else if (type === 'ferry') {
-    add(paint(new THREE.BoxGeometry(L * 0.6, L * 0.14, W * 0.9), 0xe3d6bc, 0xf0e8d6), -L * 0.05, L * 0.12, 0);
-    add(paint(new THREE.BoxGeometry(L * 0.3, L * 0.1, W * 0.6), 0xe3d6bc, 0xf0e8d6), -L * 0.1, L * 0.23, 0);
-    add(paint(new THREE.CylinderGeometry(L * 0.04, L * 0.05, L * 0.2, 8), 0x1f7f78, 0x1f7f78), -L * 0.18, L * 0.36, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.62, L * 0.13, W * 0.92), 0x9a9384, 0xb8b0a0), -L * 0.06, L * 0.12, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.34, L * 0.1, W * 0.66), 0x9a9384, 0xb8b0a0), -L * 0.1, L * 0.24, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.12, L * 0.07, W * 0.5), 0x2a3440, 0x3c4a58), L * 0.06, L * 0.32, 0);
+    add(paint(new THREE.CylinderGeometry(L * 0.045, L * 0.055, L * 0.2, 10), 0x1f7f78, 0x0a0c10), -L * 0.2, L * 0.38, 0);
+    mast(L * 0.18, L * 0.45);
   } else if (type === 'barge') {
-    for (let i = 0; i < 3; i++) add(paint(new THREE.BoxGeometry(L * 0.22, L * 0.09, W * 0.7), i === 1 ? 0x8a2a20 : 0x3f4a52, 0x9aa3a8), -L * 0.3 + i * L * 0.26, L * 0.1, 0);
-    add(paint(new THREE.BoxGeometry(L * 0.14, L * 0.13, W * 0.6), 0x5a4330, 0x8a7258), -L * 0.42, L * 0.12, 0);
+    for (let i = 0; i < 3; i++) add(paint(new THREE.BoxGeometry(L * 0.21, L * 0.07, W * 0.72), i === 1 ? 0x7a2a20 : 0x34424a, i === 1 ? 0x9a3a2c : 0x55656e), -L * 0.24 + i * L * 0.25, L * 0.1, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.13, L * 0.16, W * 0.62), 0x8a8274, 0xa8a090), -L * 0.42, L * 0.14, 0);
+    mast(-L * 0.42, L * 0.3);
   } else if (type === 'cutter') {
-    add(paint(new THREE.BoxGeometry(L * 0.4, L * 0.1, W * 0.8), 0x4a5560, 0x8a9aa6), -L * 0.1, L * 0.1, 0);
-    add(paint(new THREE.BoxGeometry(L * 0.18, L * 0.09, W * 0.5), 0x4a5560, 0x8a9aa6), -L * 0.08, L * 0.2, 0);
-    add(paint(new THREE.CylinderGeometry(0.08, 0.1, L * 0.3, 6), 0x2a2f36, 0x2a2f36).rotateZ(Math.PI / 2), L * 0.3, L * 0.12, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.4, L * 0.1, W * 0.8), 0x4a5560, 0x6f7c88), -L * 0.08, L * 0.1, 0);
+    add(paint(new THREE.BoxGeometry(L * 0.18, L * 0.09, W * 0.52), 0x4a5560, 0x6f7c88), -L * 0.06, L * 0.2, 0);
+    add(paint(new THREE.CylinderGeometry(0.35, 0.45, 0.4, 8), 0x2a2f36, 0x3a4048), L * 0.26, L * 0.12, 0);
+    add(paint(new THREE.CylinderGeometry(0.08, 0.1, L * 0.22, 6), 0x2a2f36, 0x2a2f36).rotateZ(Math.PI / 2), L * 0.36, L * 0.13, 0);
+    mast(-L * 0.04, L * 0.5);
   }
   return mergeGeometries(parts);
 }
@@ -253,10 +287,40 @@ export class Entities {
       const port = side(-1);
       const star = side(1);
       if (ship.st !== 'wreck' || v.sink < 0.6) {
-        this.glow(port.x, y0 + L * 0.12, port.z, 1 * k, 0.15, 0.1, 4 * k);
-        this.glow(star.x, y0 + L * 0.12, star.z, 0.1, 0.9 * k, 0.5, 4 * k);
-        this.glow(p.x, y0 + L * 0.5, p.z, 0.95 * k, 0.9 * k, 0.8 * k, 5 * k);
-        if (ship.st === 'distress') this.glow(p.x, y0 + L * 0.3, p.z, 1, 0.4, 0.1, 10 + 6 * Math.sin(time * 8));
+        this.glow(port.x, y0 + L * 0.12, port.z, 1.6 * k, 0.12, 0.08, 4.5 * k);
+        this.glow(star.x, y0 + L * 0.12, star.z, 0.08, 1.4 * k, 0.6, 4.5 * k);
+        this.glow(p.x, y0 + L * 0.5, p.z, 1.4 * k, 1.3 * k, 1.15 * k, 5.5 * k);
+        if (ship.st === 'distress') this.glow(p.x, y0 + L * 0.3, p.z, 1.6, 0.5, 0.1, 12 + 7 * Math.sin(time * 8));
+        // Cabin windows: a warm row along the deck house, so a ship reads as a ship from far off.
+        const fx = Math.sin(p.h);
+        const fz = Math.cos(p.h);
+        const wins = def.id === 'ferry' ? 6 : def.id === 'barge' ? 2 : def.id === 'cutter' ? 3 : 1;
+        const deckY = y0 + L * (def.id === 'ferry' ? 0.17 : 0.13);
+        for (let i = 0; i < wins; i++) {
+          const a = wins === 1 ? -0.25 : -0.32 + (i / (wins - 1)) * (def.id === 'ferry' ? 0.42 : 0.2);
+          for (const sgn of [-1, 1]) {
+            const ox = p.x + fx * a * L + Math.cos(p.h) * sgn * L * 0.12;
+            const oz = p.z + fz * a * L - Math.sin(p.h) * sgn * L * 0.12;
+            const flick = 0.85 + 0.15 * Math.sin(time * 3 + i * 1.7 + sgn);
+            this.glow(ox, deckY, oz, 1.0 * flick, 0.62 * flick, 0.26 * flick, 2.2);
+          }
+        }
+        // The wake: two lines of white water opening behind the stern, bright where the light falls.
+        if (ship.st === 'sail' && ship.v > 0.2) {
+          const pool = LIGHT.uPool.value;
+          const inPool = Math.hypot(p.x - pool.x, p.z - pool.z) < pool.w * 1.3 ? Math.min(1.5, LIGHT.uPoolI.value) : 0;
+          const lit = 0.08 + inPool * 0.9;
+          for (let j = 1; j <= 8; j++) {
+            const back = L * (0.42 + j * 0.2);
+            const spread = L * 0.1 + j * 0.65;
+            for (const sgn of [-1, 1]) {
+              const wx = p.x - fx * back + Math.cos(p.h) * sgn * spread;
+              const wz = p.z - fz * back - Math.sin(p.h) * sgn * spread;
+              const f = (1 - j / 9) * lit;
+              this.glow(wx, this.waterY(wx, wz, storm) + 0.2, wz, 0.55 * f, 0.68 * f, 0.7 * f, 2.2 + j * 0.45);
+            }
+          }
+        }
       }
     }
     for (const id of [...this.ships.keys()]) if (!seen.has(id)) this.removeVisual(this.ships, id);
@@ -290,17 +354,37 @@ export class Entities {
         v.parts.push(one);
       }
     } else if (h.type === 'siren') {
-      const rock = new THREE.Mesh(paint(new THREE.IcosahedronGeometry(2.4, 0), 0x2b3a3c, 0x55656a), this.mat);
-      rock.position.y = -0.6;
-      const body = new THREE.Mesh(paint(new THREE.ConeGeometry(0.6, 1.9, 6), 0x1b4f52, 0x8fd6cc), this.mat);
-      body.position.y = 1.6;
-      const head = new THREE.Mesh(paint(new THREE.SphereGeometry(0.36, 7, 6), 0xbfe4df), this.mat);
-      head.position.y = 2.75;
-      const hair = new THREE.Mesh(paint(new THREE.ConeGeometry(0.5, 1.4, 6), 0x0e2234, 0x1f7f78), this.mat);
-      hair.position.y = 2.4;
-      hair.rotation.x = Math.PI;
-      group.add(rock, body, head, hair);
-      v.parts.push(body, head, hair);
+      // She sits on her rock facing the channel: a long tail curled down the stone, a slim body leaning back on one
+      // arm, the other raised, her hair streaming in the wind. A silhouette first, lit only by what finds her.
+      const rock = new THREE.Mesh(paint(new THREE.IcosahedronGeometry(2.6, 0), 0x1d2a2c, 0x46575b), this.mat);
+      rock.position.y = -0.7;
+      rock.scale.set(1.3, 0.85, 1.1);
+      const figure = new THREE.Group();
+      const tail = new THREE.Mesh(paint(new THREE.TorusGeometry(0.9, 0.26, 6, 12, Math.PI * 1.1), 0x0f3b3c, 0x2f8f86), this.mat);
+      tail.rotation.set(Math.PI / 2, 0.3, 0.4);
+      tail.position.set(0.4, 1.0, 0.2);
+      const fin = new THREE.Mesh(paint(new THREE.ConeGeometry(0.42, 0.7, 4), 0x2f8f86, 0x6fd0c4), this.mat);
+      fin.position.set(1.15, 0.75, -0.5);
+      fin.rotation.set(0.4, 0, -1.9);
+      const body = new THREE.Mesh(paint(new THREE.CylinderGeometry(0.22, 0.4, 1.7, 7), 0x245e60, 0xa6ddd5), this.mat);
+      body.position.set(-0.15, 1.95, 0);
+      body.rotation.z = 0.28;
+      const head = new THREE.Mesh(paint(new THREE.SphereGeometry(0.3, 8, 7), 0xbfe4df), this.mat);
+      head.position.set(-0.42, 3.0, 0);
+      const hair = new THREE.Mesh(paint(new THREE.ConeGeometry(0.42, 2.1, 6), 0x061a20, 0x16605c), this.mat);
+      hair.position.set(-0.05, 2.45, -0.25);
+      hair.rotation.set(-0.5, 0, -2.3);
+      const arm = new THREE.Mesh(paint(new THREE.CylinderGeometry(0.07, 0.09, 1.25, 5), 0x7fc4ba), this.mat);
+      arm.position.set(-0.75, 3.15, 0.15);
+      arm.rotation.z = 0.85;
+      const arm2 = new THREE.Mesh(paint(new THREE.CylinderGeometry(0.07, 0.09, 1.2, 5), 0x7fc4ba), this.mat);
+      arm2.position.set(0.35, 1.55, 0.3);
+      arm2.rotation.z = -0.9;
+      figure.add(tail, fin, body, head, hair, arm, arm2);
+      figure.scale.setScalar(1.45);
+      group.add(rock, figure);
+      v.parts.push(figure, head, hair);
+      v.figure = figure;
     } else if (h.type === 'mimic') {
       const raft = new THREE.Mesh(paint(new THREE.BoxGeometry(7, 0.6, 3), 0x121a1e, 0x2a3a40), this.mat);
       raft.visible = false;
@@ -382,13 +466,24 @@ export class Entities {
         v.group.position.set(h.x, this.waterY(h.x, h.z, storm) + 0.6, h.z);
         v.group.rotation.y = Math.atan2(-h.x, -h.z);
         const sing = h.st === 'sing' && h.silenced <= 0 && h.scared <= 0;
-        v.parts[0].scale.y = 1 + (sing ? Math.sin(time * 3) * 0.08 : 0);
+        v.figure.rotation.z = sing ? Math.sin(time * 1.4) * 0.06 : 0;
+        v.figure.scale.y = 1 + (sing ? Math.sin(time * 3) * 0.03 : 0);
         if (!tell) {
-          this.glow(h.x, v.group.position.y + 2.8, h.z, 0.2, 1, 0.85, sing ? 7 + 3 * Math.sin(time * 5) : 3);
+          // Her eyes: two cold sparks, wide open while she sings.
+          const ey = v.group.position.y + 4.42;
+          const facing = v.group.rotation.y;
+          const hx = h.x - 0.61 * Math.cos(facing) + Math.sin(facing) * 0.3;
+          const hz = h.z + 0.61 * Math.sin(facing) + Math.cos(facing) * 0.3;
+          const ex = Math.cos(facing) * 0.17;
+          const ez = -Math.sin(facing) * 0.17;
+          const eyeI = sing ? 2.4 : 0.9;
+          this.glow(hx + ex, ey, hz + ez, 0.25 * eyeI, 1.2 * eyeI, 1.0 * eyeI, 2.6);
+          this.glow(hx - ex, ey, hz - ez, 0.25 * eyeI, 1.2 * eyeI, 1.0 * eyeI, 2.6);
+          this.glow(h.x, v.group.position.y + 4.0, h.z, 0.12, 0.6, 0.5, sing ? 10 + 3 * Math.sin(time * 5) : 4);
           if (sing) for (let i = 0; i < 5; i++) {
             const ph = (time * 0.5 + i * 0.2) % 1;
             const a = i * 1.3 + time;
-            this.glow(h.x + Math.cos(a) * (3 + ph * 20), v.group.position.y + 2 + ph * 6, h.z + Math.sin(a) * (3 + ph * 20), 0.2, 0.9 * (1 - ph), 0.8 * (1 - ph), 3 * (1 - ph));
+            this.glow(h.x + Math.cos(a) * (3 + ph * 20), v.group.position.y + 3.5 + ph * 6, h.z + Math.sin(a) * (3 + ph * 20), 0.2, 0.9 * (1 - ph), 0.8 * (1 - ph), 3 * (1 - ph));
           }
         }
         if (h.st === 'dead') v.group.position.y -= dt * 4;

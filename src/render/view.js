@@ -35,6 +35,7 @@ export class View {
     this.shake = 0;
     this.time = 0;
     this.dusk = 1;
+    this.dawn = 0;
     this.raycaster = new THREE.Raycaster();
     this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.gfx.onQuality((q) => {
@@ -174,10 +175,20 @@ export class View {
     // Shake on big hits; never under reduced motion.
     this.shake = Math.max(0, this.shake - dt * 3);
     const sh = reduced ? 0 : this.shake;
-    this.camera.position.set(rig.pos.x + Math.sin(t * 61) * 0.04 * sh, rig.pos.y + Math.sin(t * 47) * 0.05 * sh, rig.pos.z + Math.cos(t * 53) * 0.04 * sh);
-    const look = tmp2.set(this.camera.position.x + Math.sin(rig.yaw) * Math.cos(rig.pitch), this.camera.position.y + Math.sin(rig.pitch), this.camera.position.z + Math.cos(rig.yaw) * Math.cos(rig.pitch));
-    this.camera.lookAt(look);
-    this.camera.rotateZ(Math.sin(t * 43) * 0.01 * sh);
+    if (opts.camera) {
+      // A photo from outside the keeper's eyes (store art, the dawn photo): the camera is placed, not carried.
+      this.camera.position.copy(opts.camera.pos);
+      this.camera.lookAt(opts.camera.target);
+      if (opts.camera.fov && this.camera.fov !== opts.camera.fov) {
+        this.camera.fov = opts.camera.fov;
+        this.camera.updateProjectionMatrix();
+      }
+    } else {
+      this.camera.position.set(rig.pos.x + Math.sin(t * 61) * 0.04 * sh, rig.pos.y + Math.sin(t * 47) * 0.05 * sh, rig.pos.z + Math.cos(t * 53) * 0.04 * sh);
+      const look = tmp2.set(this.camera.position.x + Math.sin(rig.yaw) * Math.cos(rig.pitch), this.camera.position.y + Math.sin(rig.pitch), this.camera.position.z + Math.cos(rig.yaw) * Math.cos(rig.pitch));
+      this.camera.lookAt(look);
+      this.camera.rotateZ(Math.sin(t * 43) * 0.01 * sh);
+    }
     // Light uniforms from the beam.
     LIGHT.uTime.value = t;
     LIGHT.uCamera.value.copy(this.camera.position);
@@ -206,20 +217,29 @@ export class View {
     }
     LIGHT.uNWraiths.value = nw;
     LIGHT.uNHoles.value = nh;
-    const fogBase = 0.0016 + (1 - weather.vis) * 0.004 + weather.fog * 0.004;
+    const fogBase = 0.0019 + (1 - weather.vis) * 0.004 + weather.fog * 0.0045;
     LIGHT.uFogDensity.value = fogBase;
-    LIGHT.uFogColor.value.setRGB(0.04 + weather.fog * 0.06, 0.08 + weather.fog * 0.07, 0.12 + weather.fog * 0.07);
-    LIGHT.uAmbient.value = 0.05 + (opts.bright ? 0.02 : 0) + (state.phase === 'dusk' ? 0.08 * this.dusk : 0);
+    // Linear light: a deep blue-black haze, paler and greyer in fog.
+    LIGHT.uFogColor.value.setRGB(0.006 + weather.fog * 0.02, 0.011 + weather.fog * 0.024, 0.02 + weather.fog * 0.028);
+    LIGHT.uAmbient.value = 0.05 + (opts.bright ? 0.02 : 0) + (state.phase === 'dusk' ? 0.12 * this.dusk : 0);
     // Dusk fades into night over the dusk phase; dawn warms the world at the end.
     const duskTarget = state.phase === 'dusk' ? Math.min(1, state.duskLeft / 45) : 0;
     this.dusk += (duskTarget - this.dusk) * Math.min(1, dt * 2);
-    LIGHT.uDawn.value = state.phase === 'dawn' ? 1 - Math.max(0, state.dawnLeft / 6) : state.phase === 'over' && state.result === 'dawn' ? 1 : 0;
+    const dawnTarget = state.phase === 'dawn' ? 1 - Math.max(0, state.dawnLeft / 6) : state.phase === 'over' && state.result === 'dawn' ? 1 : 0;
+    this.dawn += (dawnTarget - this.dawn) * Math.min(1, dt * 0.8);
+    LIGHT.uDawn.value = this.dawn;
+    this.gfx.exposure = 1 + this.dawn * 0.25;
+    this.gfx.warm = Math.max(this.dawn, this.dusk * 0.6);
     // Pieces.
     this.sky.update(this.camera, this.dusk, weather.fog);
     const lensPos = tmp.set(0, H + 0.95, 0);
     const poolY = this.sea.heightAt(c.x, c.z, t, weather.storm, site.waveMul);
     const target = beam.mode === 'sweep' ? tmp2.set(Math.sin(beam.sweepAz) * 320, 0, Math.cos(beam.sweepAz) * 320) : tmp2.set(c.x, poolY, c.z);
-    this.beam.update(lensPos, target, beam.mode === 'sweep' ? 40 : beam.r, beam.mode === 'sweep' ? sweepI * 0.9 : I, LIGHT.uLens.value, { strobe: beam.strobe && !reduced ? 1 : 0, sweep: beam.mode === 'sweep', haze: 0.7 + weather.fog * 0.8 + weather.rain * 0.3, quality: this.gfx.quality });
+    const beamI = beam.mode === 'sweep' ? sweepI * 0.9 : I;
+    this.beam.update(lensPos, target, beam.mode === 'sweep' ? 40 : beam.r, beamI, LIGHT.uLens.value, { strobe: beam.strobe && !reduced ? 1 : 0, sweep: beam.mode === 'sweep', haze: 0.7 + weather.fog * 0.8 + weather.rain * 0.3, quality: this.gfx.quality, rain: weather.rain });
+    const headAz = beam.mode === 'sweep' ? beam.sweepAz : beam.az;
+    LIGHT.uBeamDir.value.set(Math.sin(headAz), Math.cos(headAz), beam.mode === 'sweep' ? 0.02 : -0.05, beamI);
+    LIGHT.uLampPos.value.set(0, H + 0.95, 0, on && state.res.oil > 0 ? 0.6 : 0.05);
     this.tower.update(dt, beam, t, {
       lampOn: on && state.res.oil > 0,
       crankOn: Boolean(state.crank.on),
@@ -231,6 +251,7 @@ export class View {
       needle: Math.min(1, (state.ships.filter((s) => s.needs).length + (state.horn.on ? 1 : 0)) * 0.4 + weather.static),
       cansLeft: state.res.oilCans,
       crateTaken: Boolean(state.flags.crateTaken),
+      rain: weather.rain || 0,
     });
     this.entities.update(state, dt, t, Boolean(state.mods.brightShips));
     this.chartTimer = (this.chartTimer || 0) + dt;
@@ -239,11 +260,11 @@ export class View {
       drawChart(this.tower.chartCanvas.getContext('2d'), 256, state, { radar: state.mods.radar, labels: false, paper: true });
       this.tower.chartTex.needsUpdate = true;
     }
-    const inside = rig.station !== 'gallery' && !moving;
+    const inside = !opts.camera && rig.station !== 'gallery' && !moving;
     this.weather.update(dt, this.camera, weather, reduced, inside);
     for (const fx of opts.fx || []) {
       if (fx.k === 'lightning') {
-        this.weather.strike(fx.x, fx.z, fx.near);
+        this.weather.strike(fx.x, fx.z, fx.near, this.camera);
         if (fx.near) this.kick(0.5);
       } else if (fx.k === 'harpoon') this.kick(0.35);
       else if (fx.k === 'door' || fx.k === 'titan-slam' || fx.k === 'crack') this.kick(0.6);
@@ -253,41 +274,79 @@ export class View {
     this.gfx.render(t, this.weather.flash);
   }
 
-  /** A calm picture for the title: the tower from the sea at dusk. */
-  updateTitle(dt, state) {
+  /**
+   * The title: the tower seen from a boat in a storm, its beam sweeping the sea and passing over the camera, a
+   * ferry's lights crossing the channel behind, rain, spray on the rock and now and then lightning.
+   */
+  updateTitle(dt, opts = {}) {
     dt = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0.016;
     this.time += dt;
     const t = this.time;
     const H = this.site.towerHeight;
-    const a = t * 0.05;
-    this.camera.position.set(Math.sin(a) * 88, 13 + Math.sin(t * 0.3) * 0.8, Math.cos(a) * 88);
-    const side = Math.atan2(this.camera.position.x, this.camera.position.z) - Math.PI / 2;
-    this.camera.lookAt(Math.sin(side) * 30, H * 0.55, Math.cos(side) * 30);
+    const reduced = Boolean(opts.reducedMotion);
+    const T = this.titleState || (this.titleState = makeTitleState(this.route));
+    // A low camera rising and falling on the swell, the moon behind the tower's shoulder, the tower on the right third.
+    const bob = reduced ? 0 : Math.sin(t * 0.55) * 0.9 + Math.sin(t * 0.23) * 0.5;
+    const roll = reduced ? 0 : Math.sin(t * 0.47) * 0.018;
+    const camA = 2.95 + (reduced ? 0 : Math.sin(t * 0.03) * 0.04);
+    const camD = this.gfx.width < this.gfx.height ? 96 : 78;
+    this.camera.position.set(Math.sin(camA) * camD, 4.5 + bob, Math.cos(camA) * camD);
+    const toward = camA + Math.PI;
+    const sideA = toward + Math.PI / 2;
+    const off = this.gfx.width < this.gfx.height ? 0 : 20;
+    this.camera.lookAt(Math.sin(sideA) * off, H * 0.62, Math.cos(sideA) * off);
+    this.camera.rotateZ(roll);
+    // The day between nights is the same view in the grey-gold of morning: the storm spent, the lamp out.
+    const day = Boolean(opts.day);
+    const storm = day ? 0.32 : 0.78;
+    this.dawn += ((day ? 0.92 : 0) - this.dawn) * Math.min(1, dt * 1.5);
     LIGHT.uTime.value = t;
     LIGHT.uCamera.value.copy(this.camera.position);
-    LIGHT.uStorm.value = 0.3;
+    LIGHT.uStorm.value = storm;
     LIGHT.uPoolI.value = 0;
     LIGHT.uNFlares.value = 0;
     LIGHT.uNWraiths.value = 0;
     LIGHT.uNHoles.value = 0;
-    LIGHT.uDawn.value = 0;
-    LIGHT.uFogDensity.value = 0.0022;
-    LIGHT.uFogColor.value.setRGB(0.04, 0.08, 0.12);
-    LIGHT.uAmbient.value = 0.09;
-    setLens('amber');
-    const az = t * 0.5;
-    LIGHT.uSweep.value.set(Math.sin(az), Math.cos(az), Math.cos(SWEEP_HALF), 0.6);
-    LIGHT.uSweepReach.value = 360;
-    this.dusk += (0.6 - this.dusk) * Math.min(1, dt);
-    this.sky.update(this.camera, this.dusk, 0.1);
-    this.beam.update(tmp.set(0, H + 0.95, 0), tmp2.set(Math.sin(az) * 320, 0, Math.cos(az) * 320), 40, 0.6, LIGHT.uLens.value, { sweep: true, haze: 0.9, quality: this.gfx.quality });
+    LIGHT.uDawn.value = this.dawn;
+    LIGHT.uFogDensity.value = day ? 0.0022 : 0.0028;
+    LIGHT.uFogColor.value.setRGB(0.007, 0.013, 0.022);
+    LIGHT.uAmbient.value = 0.06;
+    this.gfx.exposure = 1 + this.dawn * 0.2;
+    this.gfx.warm = this.dawn;
+    setLens('white');
+    const az = t * ((Math.PI * 2) / 10) + 2.2;
+    const sweepI = 0.85 * (1 - this.dawn);
+    LIGHT.uSweep.value.set(Math.sin(az), Math.cos(az), Math.cos(SWEEP_HALF), sweepI);
+    LIGHT.uSweepReach.value = 380;
+    LIGHT.uBeamDir.value.set(Math.sin(az), Math.cos(az), 0.02, sweepI);
+    LIGHT.uLampPos.value.set(0, H + 0.95, 0, 0.9);
+    this.dusk += (0 - this.dusk) * Math.min(1, dt);
+    this.sky.update(this.camera, this.dusk, 0.2);
+    this.beam.update(tmp.set(0, H + 0.95, 0), tmp2.set(Math.sin(az) * 340, 2, Math.cos(az) * 340), 40, sweepI, LIGHT.uLens.value, { sweep: true, haze: 1.3, quality: this.gfx.quality, rain: 0.85 });
     this.tower.update(dt, { mode: 'sweep', sweepAz: az, az }, t, { lampOn: true, cat: false });
-    if (state) this.entities.update(state, dt, t);
-    else {
-      this.entities.glowCount = 0;
-      this.entities.glows.geometry.setDrawRange(0, 0);
+    // The ferry steams along the channel, round and round.
+    T.ships[0].s = (T.ships[0].s + dt * 3.6) % (this.route.L * 0.8);
+    T.weather.storm = storm;
+    T.weather.rain = day ? 0 : 0.85;
+    this.entities.update(T, dt, t);
+    // Lightning out at sea every few seconds (a soft flash when motion is reduced).
+    T.nextStrike -= dt;
+    if (T.nextStrike <= 0 && !day) {
+      T.nextStrike = 7 + ((t * 7919) % 5);
+      const a = 2.6 + ((t * 104729) % 1.4);
+      this.weather.strike(Math.sin(a) * 260, Math.cos(a) * 260, false, this.camera);
     }
-    this.weather.update(dt, this.camera, { storm: 0.3, rain: 0, fog: 0.1, vis: 1 }, false, false);
-    this.gfx.render(t, 0);
+    this.weather.update(dt, this.camera, T.weather, reduced, false);
+    this.gfx.render(t, this.weather.flash);
   }
+}
+
+/** A tiny stand-in night for the title: one ferry on the route, nothing else. */
+function makeTitleState(route) {
+  return {
+    weather: { storm: 0.78, rain: 0.85, fog: 0.15, vis: 0.6 },
+    ships: [{ id: 'title-ferry', type: 'ferry', name: 'Hesper', s: route.L * 0.18, d: -3, st: 'sail', guided: 0, credit: 0 }],
+    hostiles: [], crates: [], pools: [], shots: [], mods: { brightShips: false },
+    nextStrike: 2.5,
+  };
 }

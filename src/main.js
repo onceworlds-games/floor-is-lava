@@ -349,7 +349,7 @@ async function boot() {
     const state = session.state;
     const inNight = state && (G.phase === 'dusk' || G.phase === 'night' || G.phase === 'over');
     if (!inNight) {
-      if (!document.hidden) view.updateTitle(dt, null);
+      if (!document.hidden) view.updateTitle(dt, { reducedMotion: settings.reducedMotion, day: G.phase === 'day' || G.phase === 'over' });
       hud.clear();
       audio.idle(dt);
       if (session.awaitingSnapshot && screens.name !== 'waiting' && session.room.match.phase !== 'lobby') screens.waiting('Joining the night');

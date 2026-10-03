@@ -16,9 +16,12 @@ export const LIGHT = {
   uHoles: { value: [new THREE.Vector4(), new THREE.Vector4()] },
   uNHoles: { value: 0 },
   uFlash: { value: 0 },
-  uMoon: { value: new THREE.Vector3(0.3, 0.6, 0.74).normalize() },
+  uFlashPos: { value: new THREE.Vector3(0, 300, 200) }, // where the last bolt came down (the sky glows there)
+  uMoon: { value: new THREE.Vector3(-0.434, 0.423, 0.795).normalize() },
   uAmbient: { value: 0.07 },
   uLamp: { value: new THREE.Vector4(0, 34, 0, 0) }, // the lamp as a point light for the interior
+  uLampPos: { value: new THREE.Vector4(0, 35, 0, 1) }, // the great lamp itself, for its glint on the water: xyz, brightness
+  uBeamDir: { value: new THREE.Vector4(0, 1, 0, 0) }, // the beam's heading on the sky: sin az, cos az, elevation, intensity
   uFogColor: { value: new THREE.Color(0x0a1420) },
   uFogDensity: { value: 0.0022 },
   uTime: { value: 0 },
@@ -47,6 +50,9 @@ uniform vec4 uFlares[4]; uniform int uNFlares; uniform vec4 uWraiths[2]; uniform
 uniform float uFlash; uniform vec3 uMoon; uniform float uAmbient; uniform vec4 uLamp; uniform vec3 uFogColor; uniform float uFogDensity;
 uniform float uTime; uniform vec3 uCamera; uniform float uStorm; uniform float uDawn;
 
+const vec3 MOON_COL = vec3(0.30, 0.42, 0.62);
+const vec3 DAWN_COL = vec3(1.0, 0.56, 0.30);
+
 // How much of the beam reaches world point p (fog banks eat it, holes let it through).
 float wraithPass(vec3 p) {
   float pass = 1.0;
@@ -64,56 +70,66 @@ float wraithPass(vec3 p) {
   return pass;
 }
 
-// The light falling on p from the lamp (spot pool or sweep wedge) and the flares: colour * intensity.
+// The light falling on p from the lamp (spot pool or sweep wedge) and the flares: colour * intensity, in linear light.
+// The pool is hot (several times the moon): only what the light reveals exists.
 vec3 beamLight(vec3 p) {
   vec3 L = vec3(0.0);
   if (uPoolI > 0.0) {
     float d = distance(p.xz, uPool.xz);
     float r = uPool.w;
-    float core = 1.0 - smoothstep(r * 0.85, r * 1.25, d);
-    float halo = (1.0 - smoothstep(r, r * 3.0, d)) * 0.12;
-    L += uLens * uPoolI * (core + halo);
+    float core = 1.0 - smoothstep(r * 0.72, r * 1.18, d);
+    float hot = 1.0 - smoothstep(0.0, r * 0.55, d);
+    float halo = (1.0 - smoothstep(r, r * 3.2, d)) * 0.1;
+    L += uLens * uPoolI * (core * 1.7 + hot * 0.7 + halo);
   }
   if (uSweep.w > 0.0) {
     vec2 dir = normalize(p.xz + vec2(1e-4));
     float c = dot(dir, uSweep.xy);
     float dist = length(p.xz);
-    float wedge = smoothstep(uSweep.z - 0.03, uSweep.z + 0.02, c);
-    float reach = 1.0 - smoothstep(uSweepReach * 0.5, uSweepReach, dist);
-    L += uLens * uSweep.w * wedge * reach * step(18.0, dist);
+    float wedge = smoothstep(uSweep.z - 0.035, uSweep.z + 0.03, c);
+    float centre = smoothstep(uSweep.z + 0.01, 1.0, c);
+    float reach = 1.0 - smoothstep(uSweepReach * 0.45, uSweepReach, dist);
+    L += uLens * uSweep.w * (wedge * 1.8 + centre * 1.2) * reach * smoothstep(14.0, 22.0, dist);
   }
   L *= wraithPass(p);
   for (int i = 0; i < 4; i++) {
     if (i >= uNFlares) break;
     vec4 f = uFlares[i];
     float d = distance(p.xz, f.xy);
-    float k = 1.0 - smoothstep(f.z * 0.6, f.z * 1.3, d);
-    L += vec3(1.0, 0.85, 0.6) * f.w * k;
+    float k = 1.0 - smoothstep(f.z * 0.5, f.z * 1.3, d);
+    L += vec3(1.0, 0.62, 0.32) * f.w * k * 2.4;
   }
   return L;
 }
 
-// A surface shaded by the world: moon, beam, flares, the lamp room's glow, lightning; then fog.
+// A surface shaded by the world: a dark sky, the moon, the beam (the hero light), flares, the lamp room's glow,
+// lightning and the dawn; a rim of cold moonlight (warm near the pool) so silhouettes read; then fog.
 vec3 shadeWorld(vec3 base, vec3 p, vec3 n, float emissive) {
-  float moon = max(0.0, dot(n, uMoon));
-  vec3 moonCol = vec3(0.55, 0.72, 0.9);
-  vec3 col = base * (uAmbient + 0.16 * moon) * mix(1.0, 0.6, uStorm) * moonCol;
-  vec3 bl = beamLight(p);
   vec3 toCam = normalize(uCamera - p);
-  float facing = 0.35 + 0.65 * max(0.0, dot(n, toCam));
-  col += base * bl * facing;
+  float ndv = max(0.0, dot(n, toCam));
+  float moon = max(0.0, dot(n, uMoon));
+  float sky = 0.5 + 0.5 * n.y;
+  float storm = mix(1.0, 0.45, uStorm);
+  vec3 col = base * (vec3(0.10, 0.16, 0.26) * uAmbient * (0.35 + 0.65 * sky) + MOON_COL * moon * 0.05 * storm);
+  vec3 bl = beamLight(p);
+  col += base * bl * (0.3 + 0.7 * ndv);
+  // Rim: grazing angles catch the moon (and the beam nearby), so ships and creatures stand out of the dark sea.
+  float rim = pow(1.0 - ndv, 3.0);
+  col += rim * (MOON_COL * 0.06 * storm + bl * 0.35 + uFlash * vec3(0.45, 0.55, 0.75) * 0.7) * (0.6 + 0.4 * moon);
   if (uLamp.w > 0.0) {
     vec3 toLamp = uLamp.xyz - p;
     float dl = length(toLamp);
-    float k = uLamp.w / (1.0 + dl * dl * 0.14) * max(0.2, dot(n, toLamp / max(dl, 0.01)));
-    col += base * vec3(1.0, 0.72, 0.4) * k;
+    float k = uLamp.w / (1.0 + dl * dl * 0.14) * max(0.15, dot(n, toLamp / max(dl, 0.01)));
+    col += base * vec3(1.0, 0.58, 0.24) * k;
   }
-  col += base * uFlash * vec3(0.8, 0.9, 1.0) * (0.4 + 0.6 * max(0.0, n.y));
-  col = mix(col, base * vec3(1.0, 0.75, 0.5), uDawn * 0.6);
+  col += base * uFlash * vec3(0.55, 0.68, 0.95) * (0.2 + 0.8 * max(0.0, n.y)) * 0.55;
+  // Dawn: a low warm sun from the east and a paler sky.
+  float sun = max(0.0, dot(n, normalize(vec3(0.9, 0.25, -0.2))));
+  col = mix(col, base * (DAWN_COL * (0.12 + 0.85 * sun) + vec3(0.10, 0.12, 0.16)), uDawn * 0.85);
   col += base * emissive;
   float dist = distance(uCamera, p);
   float fog = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
-  vec3 fogCol = uFogColor + uFlash * 0.5 + bl * 0.08;
+  vec3 fogCol = uFogColor + uFlash * vec3(0.08, 0.1, 0.14) + bl * 0.02 + uDawn * vec3(0.16, 0.12, 0.1);
   return mix(col, fogCol, clamp(fog, 0.0, 1.0));
 }
 `;
