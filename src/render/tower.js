@@ -164,6 +164,15 @@ export class Tower {
     this.mesh(cyl(3.6, 3.6, 0.3, 20, C.wood, C.wood)).position.y = wy + 3.4;
     const sill = this.mesh(box(0.3, 0.2, 3.2, C.wood, C.wood));
     sill.position.set(3.6, wy + 1.05, 0);
+    // The window's iron frame: posts and a head rail across the opening toward the channel.
+    for (let i = 0; i <= 4; i++) {
+      const a = Math.PI * (0.12 + (i / 4) * 0.76);
+      const post = this.mesh(box(0.09, 3.3, 0.09, C.iron, C.brassDark));
+      post.position.set(Math.sin(a) * 3.55, wy + 1.7, Math.cos(a) * 3.55);
+    }
+    const head = this.mesh(paint(new THREE.TorusGeometry(3.55, 0.06, 4, 24, Math.PI * 0.76), C.iron, C.iron), this.matSmooth);
+    head.rotation.set(Math.PI / 2, 0, Math.PI * 0.12 - Math.PI / 2);
+    head.position.y = wy + 2.6;
     this.table = this.mesh(box(1.8, 0.08, 1.2, C.wood, C.wood));
     this.table.position.set(1.5, wy + 0.86, 0);
     this.mesh(box(1.6, 0.8, 1.0, C.wood, C.stoneDark)).position.set(1.5, wy + 0.42, 0);
@@ -245,8 +254,8 @@ export class Tower {
     return {
       lantern: { y: H + 1.75, radius: -0.5, look: 'beam' },
       gallery: { y: H + 0.25, radius: this.site.galleryRadius - 0.5, look: 'beam' },
-      watch: { y: H - 6 + 1.6, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-0.5, 0, 0) },
-      cellar: { y: 3.05, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-0.6, 0, 0) },
+      watch: { y: H - 6 + 1.75, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-1.5, 0, -0.2) },
+      cellar: { y: 3.05, radius: 0, look: 'fixed', yaw: Math.PI * 0.5, pos: new THREE.Vector3(-1.2, 0, 0) },
     };
   }
 
@@ -267,8 +276,8 @@ export class Tower {
     const cam = LIGHT.uCamera.value;
     // The room's own lamp lights whichever room the eye is in; seen from outside, only the lamp room glows.
     if (Math.hypot(cam.x, cam.z) > 6) LIGHT.uLamp.value.set(0, this.H + 0.35, 0, lampOn ? 0.7 : 0.1);
-    else if (cam.y < 5.5) LIGHT.uLamp.value.set(2.2, 4.6, 0.8, 3.2);
-    else if (cam.y < this.H - 2) LIGHT.uLamp.value.set(0.6, this.H - 6 + 2.9, 0, 2.2);
+    else if (cam.y < 5.5) LIGHT.uLamp.value.set(2.2, 4.6, 0.8, 1.6);
+    else if (cam.y < this.H - 2) LIGHT.uLamp.value.set(0.6, this.H - 6 + 2.9, 0, 1.0);
     else LIGHT.uLamp.value.set(0, this.H + 0.35, 0, lampOn ? 1.1 : 0.2);
     const housingHex = housing === 'iron' ? C.iron : housing === 'teal' ? C.teal : housing === 'copper' ? 0xb0542a : C.brass;
     this.lamp.material.uniforms.uEmissive.value = lampOn ? 0.9 : 0.1;

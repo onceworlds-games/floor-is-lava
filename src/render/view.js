@@ -178,7 +178,7 @@ export class View {
       rig.yaw += dy * k;
       place(rig.station, rig.yaw, tmp);
       rig.pos.lerp(tmp, k);
-      const basePitch = rig.station === 'watch' ? -0.22 : rig.station === 'cellar' ? -0.05 : 0;
+      const basePitch = rig.station === 'watch' ? -0.27 : rig.station === 'cellar' ? -0.12 : 0;
       rig.pitch += (input.pitch + basePitch - rig.pitch) * k;
     }
     // Shake on big hits; never under reduced motion.

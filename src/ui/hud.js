@@ -139,7 +139,7 @@ export class Hud {
     }
     // Station ammo and holds, lower centre, above the touch controls' corners.
     const st = me ? me.st : null;
-    const baseY = h - (touch ? 150 : 44);
+    const baseY = touch ? (h > 560 ? h - 150 : 118) : h - 44;
     c.textAlign = 'center';
     c.font = `700 ${small ? 15 : 18}px Ledger, sans-serif`;
     const line = (t, y, col = INK) => {

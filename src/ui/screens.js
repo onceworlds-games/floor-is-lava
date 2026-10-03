@@ -14,7 +14,7 @@ import { drawChart } from './chart.js';
 import { ORDERS } from '../sim/data/ships.js';
 import { shipPos, reefAt } from '../sim/route.js';
 import { STATIONS } from '../sim/night.js';
-import { settings } from '../platform.js';
+import { settings, controls } from '../platform.js';
 
 export function el(tag, cls = '', text = '') {
   const e = document.createElement(tag);
@@ -454,7 +454,8 @@ export class Screens {
   dusk(state, isHost, players) {
     const s = el('div', 'screen');
     s.style.justifyContent = 'flex-end';
-    s.style.paddingBottom = 'calc(14% + var(--sab))';
+    // Above the thumbs when the touch controls are up.
+    s.style.paddingBottom = controls.touch ? 'calc(27% + var(--sab))' : 'calc(14% + var(--sab))';
     s.style.pointerEvents = 'none';
     const box = el('div');
     box.style.pointerEvents = 'auto';
@@ -638,7 +639,7 @@ export class Screens {
       lines.textContent = ledger.lines.slice(-4).join('  ·  ');
       book.append(lines);
     }
-    const row = el('div', 'row');
+    const row = el('div', 'row stick');
     let morning = null;
     if (isHost) row.append((morning = button('Morning', 'on', () => (this.click(), onContinue()), 'Enter')));
     else row.append(el('div', 'line', 'Waiting for the keeper.'));
