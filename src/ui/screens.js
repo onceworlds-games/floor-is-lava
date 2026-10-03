@@ -103,10 +103,20 @@ export class Screens {
     this.focusSlider = null;
     this.watchLabel = null;
     this.tab = 'forecast';
+    this.primary = null; // the button Enter presses on this screen
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+      const b = this.primary;
+      if (!b || !b.isConnected || b.disabled || document.activeElement === b) return;
+      if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+      e.preventDefault();
+      b.click();
+    });
   }
 
   show(name, node) {
     this.clearScreen();
+    this.primary = null;
     this.name = name;
     this.current = node;
     if (node) this.root.append(node);
@@ -212,23 +222,21 @@ export class Screens {
     const box = el('div');
     box.append(el('div', 'entry', L.entry));
     const stat = (k, v, cls = '') => {
-      const row = el('div', 'stat');
+      const row = el('div', `stat ${cls}`.trim());
       row.append(el('span', '', k));
-      const b = el('b', '', String(v));
-      if (cls) b.style.color = cls;
-      row.append(b);
+      row.append(el('b', '', String(v)));
       box.append(row);
     };
-    stat('Ships home', L.saved, '#35b6a6');
-    stat('On the reef', L.wrecked, L.wrecked ? '#d9432f' : '');
+    stat('Ships home', L.saved, 'good');
+    stat('On the reef', L.wrecked, L.wrecked ? 'bad' : '');
     stat('Coins from the sea', L.coins);
-    for (const [name, n] of L.bonuses) stat(name, `+${n}`, '#35b6a6');
-    stat('Earned', L.earned, '#f0a63a');
-    stat('Repute', `${L.rep} (${L.repDelta >= 0 ? '+' : ''}${L.repDelta})`, L.repDelta < 0 ? '#d9432f' : '#35b6a6');
+    for (const [name, n] of L.bonuses) stat(name, `+${n}`, 'good');
+    stat('Earned', L.earned, 'gold');
+    stat('Repute', `${L.rep} (${L.repDelta >= 0 ? '+' : ''}${L.repDelta})`, L.repDelta < 0 ? 'bad' : 'good');
     stat('Oil left', `${L.oilLeft}%`);
     stat('Tower', `${L.integ}%`);
-    if (L.cracks) stat('Lens cracks', L.cracks, '#d9432f');
-    if (L.titan) stat('The Titan', 'Under', '#35b6a6');
+    if (L.cracks) stat('Lens cracks', L.cracks, 'bad');
+    if (L.titan) stat('The Titan', 'Under', 'good');
     if (ctx.season.over) {
       box.append(el('h3', '', `Score ${scoreOf(ctx.season)}`));
       if (ctx.best) box.append(el('div', 'line', `Best ${ctx.best}`));
@@ -605,8 +613,9 @@ export class Screens {
   }
 
   // ---- The end of a night, over the dawn.
+  // The night's page, over the dawn: it settles low on the screen a moment after the bell, leaving the sunrise above.
   nightOver(ledger, isHost, onContinue) {
-    const s = el('div', 'screen veil');
+    const s = el('div', `screen nightover ${ledger.result === 'dawn' ? 'dawn' : 'lost'}`);
     const book = el('div', 'book');
     book.style.width = 'min(94vw, 520px)';
     const head = el('div', 'head');
@@ -614,29 +623,29 @@ export class Screens {
     head.append(el('span', 'coins', `+${ledger.earned}`));
     book.append(head);
     book.append(el('div', 'entry', ledger.entry));
-    const stat = (k, v, col = '') => {
-      const row = el('div', 'stat');
+    const stat = (k, v, cls = '') => {
+      const row = el('div', `stat ${cls}`.trim());
       row.append(el('span', '', k));
-      const b = el('b', '', String(v));
-      if (col) b.style.color = col;
-      row.append(b);
+      row.append(el('b', '', String(v)));
       book.append(row);
     };
-    stat('Ships home', ledger.saved, '#35b6a6');
-    stat('On the reef', ledger.wrecked, ledger.wrecked ? '#d9432f' : '');
-    for (const [name, n] of ledger.bonuses) stat(name, `+${n}`, '#35b6a6');
-    stat('Repute', `${ledger.rep}`, ledger.repDelta < 0 ? '#d9432f' : '#35b6a6');
+    stat('Ships home', ledger.saved, 'good');
+    stat('On the reef', ledger.wrecked, ledger.wrecked ? 'bad' : '');
+    for (const [name, n] of ledger.bonuses) stat(name, `+${n}`, 'good');
+    stat('Repute', `${ledger.rep}`, ledger.repDelta < 0 ? 'bad' : 'good');
     if (ledger.lines.length) {
       const lines = el('div', 'line');
       lines.textContent = ledger.lines.slice(-4).join('  ·  ');
       book.append(lines);
     }
     const row = el('div', 'row');
-    if (isHost) row.append(button('Morning', 'on', () => (this.click(), onContinue()), 'Enter'));
+    let morning = null;
+    if (isHost) row.append((morning = button('Morning', 'on', () => (this.click(), onContinue()), 'Enter')));
     else row.append(el('div', 'line', 'Waiting for the keeper.'));
     book.append(row);
     s.append(book);
     this.show('over', s);
+    this.primary = morning;
   }
 
   closed(reason, onAgain) {

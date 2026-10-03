@@ -25,6 +25,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); text-align: center; }
 .screen.dark { background: radial-gradient(ellipse at 50% 45%, rgba(7, 12, 21, 0.25), rgba(7, 12, 21, 0.78)); }
 .screen.veil { background: linear-gradient(180deg, rgba(7, 12, 21, 0.2), rgba(7, 12, 21, 0.78)); }
+.screen.nightover { justify-content: flex-end; padding-bottom: calc(5vh + var(--sab)); background: linear-gradient(180deg, rgba(7, 12, 21, 0), rgba(7, 12, 21, 0) 35%, rgba(7, 12, 21, 0.62)); }
+.screen.nightover.lost { justify-content: center; background: radial-gradient(ellipse at 50% 45%, rgba(40, 8, 4, 0.35), rgba(7, 12, 21, 0.85)); }
+.screen.nightover.dawn .book { animation: pageIn 0.6s 2.2s ease-out both; }
+.screen.nightover .book { max-height: calc(66vh - var(--sab)); }
 h1, h2, h3 { font-family: 'Ledger', 'Big Shoulders Stencil Display', Impact, sans-serif; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; line-height: 0.95; }
 h1 { font-size: clamp(56px, 13vw, 128px); color: var(--amber); text-shadow: 0 0 40px rgba(240, 166, 58, 0.35), 0 4px 0 #3b2306; }
 /* The title: the storm and the tower are the picture; the name sits above, one button below. */
@@ -101,6 +105,9 @@ button:focus-visible, .card:focus-visible { outline: 3px solid var(--amber); out
 .stat span { flex: none; }
 .stat::after { content: ''; order: 1; flex: 1; border-bottom: 2px dotted rgba(42, 29, 16, 0.35); transform: translateY(-4px); }
 .stat b { order: 2; color: var(--pen); font-family: 'Ledger'; font-size: 19px; }
+.stat.good b { color: var(--sea-ink); }
+.stat.bad b { color: var(--stamp); }
+.stat.gold b { color: #8a5a10; }
 .coins { font-family: 'Ledger'; font-weight: 900; font-size: 26px; color: var(--amber); }
 .book .coins { color: var(--pen); }
 .book .purse::before { content: 'PURSE '; font-size: 14px; letter-spacing: 0.18em; color: var(--pen-dim); }

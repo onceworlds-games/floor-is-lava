@@ -90,8 +90,10 @@ void main() {
   float streaks = smoothstep(0.55, 0.9, vnoise(vec2(vWorld.x * 0.08 + vWorld.z * 0.05, vWorld.z * 0.4 - uTime * 0.2))) * uStorm * 0.5;
   float foam = clamp(foamMask + streaks * vCrest, 0.0, 1.0);
   col = mix(col, uFoam * (uAmbient * 0.22 + 0.0015 + bl * 0.55 + uFlash * 0.25), foam * 0.7);
-  // Dawn: the sea takes the warm sky.
+  // Dawn: the sea takes the warm sky, and the sun lays a road of gold across it.
   col = mix(col, mix(uShallow * 0.6, DAWN_COL * 0.55, fres) + bl * 0.1, uDawn * 0.75);
+  float sd = max(0.0, dot(r, SUN_DIR));
+  col += DAWN_COL * (pow(sd, 700.0) * 26.0 + pow(sd, 40.0) * 0.5) * uDawn * (0.35 + 0.65 * near);
   float fog = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
   vec3 fogCol = uFogColor + uFlash * vec3(0.08, 0.1, 0.14) + bl * 0.03 + uDawn * vec3(0.16, 0.12, 0.1);
   col = mix(col, fogCol, clamp(fog, 0.0, 1.0));

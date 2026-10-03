@@ -52,6 +52,7 @@ uniform float uTime; uniform vec3 uCamera; uniform float uStorm; uniform float u
 
 const vec3 MOON_COL = vec3(0.30, 0.42, 0.62);
 const vec3 DAWN_COL = vec3(1.0, 0.56, 0.30);
+const vec3 SUN_DIR = vec3(0.951, 0.118, -0.285); // low in the east-south-east
 
 // How much of the beam reaches world point p (fog banks eat it, holes let it through).
 float wraithPass(vec3 p) {
@@ -124,7 +125,7 @@ vec3 shadeWorld(vec3 base, vec3 p, vec3 n, float emissive) {
   }
   col += base * uFlash * vec3(0.55, 0.68, 0.95) * (0.2 + 0.8 * max(0.0, n.y)) * 0.55;
   // Dawn: a low warm sun from the east and a paler sky.
-  float sun = max(0.0, dot(n, normalize(vec3(0.9, 0.25, -0.2))));
+  float sun = max(0.0, dot(n, SUN_DIR));
   col = mix(col, base * (DAWN_COL * (0.12 + 0.85 * sun) + vec3(0.10, 0.12, 0.16)), uDawn * 0.85);
   col += base * emissive;
   float dist = distance(uCamera, p);

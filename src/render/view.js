@@ -163,6 +163,15 @@ export class View {
       rig.pitch = -0.25 * Math.sin(k * Math.PI) * Math.sign(yb - ya) * (reduced ? 0.3 : 1) + input.pitch;
     } else {
       yaw = targetYaw(rig.station);
+      // Dawn: the keeper looks up from the work to the sunrise (not when motion is reduced).
+      const dawnTurn = !reduced && !opts.camera && (state.phase === 'dawn' || (state.phase === 'over' && state.result === 'dawn')) && anchors[rig.station].look === 'beam';
+      if (dawnTurn) {
+        this.dawnLook = Math.min(1, (this.dawnLook || 0) + dt * 0.35);
+        const sunYaw = Math.atan2(0.951, -0.285);
+        let d = sunYaw - yaw;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        yaw += d * (this.dawnLook * this.dawnLook * (3 - 2 * this.dawnLook));
+      } else this.dawnLook = 0;
       const k = 1 - Math.exp(-dt * 9);
       let dy = yaw - rig.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -235,13 +244,14 @@ export class View {
     const lensPos = tmp.set(0, H + 0.95, 0);
     const poolY = this.sea.heightAt(c.x, c.z, t, weather.storm, site.waveMul);
     const target = beam.mode === 'sweep' ? tmp2.set(Math.sin(beam.sweepAz) * 320, 0, Math.cos(beam.sweepAz) * 320) : tmp2.set(c.x, poolY, c.z);
-    const beamI = beam.mode === 'sweep' ? sweepI * 0.9 : I;
+    // At dawn the lamp is put out: the light thins as the sun comes up.
+    const beamI = (beam.mode === 'sweep' ? sweepI * 0.9 : I) * (1 - this.dawn * 0.85);
     this.beam.update(lensPos, target, beam.mode === 'sweep' ? 40 : beam.r, beamI, LIGHT.uLens.value, { strobe: beam.strobe && !reduced ? 1 : 0, sweep: beam.mode === 'sweep', haze: 0.7 + weather.fog * 0.8 + weather.rain * 0.3, quality: this.gfx.quality, rain: weather.rain });
     const headAz = beam.mode === 'sweep' ? beam.sweepAz : beam.az;
     LIGHT.uBeamDir.value.set(Math.sin(headAz), Math.cos(headAz), beam.mode === 'sweep' ? 0.02 : -0.05, beamI);
     LIGHT.uLampPos.value.set(0, H + 0.95, 0, on && state.res.oil > 0 ? 0.6 : 0.05);
     this.tower.update(dt, beam, t, {
-      lampOn: on && state.res.oil > 0,
+      lampOn: on && state.res.oil > 0 && this.dawn < 0.6,
       crankOn: Boolean(state.crank.on),
       hornOn: Boolean(state.horn.on),
       doorAttack: state.flags.doorUnderAttack > state.t - 0.2,

@@ -114,7 +114,7 @@ void main() {
 `;
 const MOTE_FRAG = /* glsl */ `
 precision highp float; varying float vA; uniform vec3 uColor; uniform float uIntensity;
-void main() { vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; float a = (1.0 - smoothstep(0.0, 1.0, d)); gl_FragColor = vec4(uColor * a * a * vA * uIntensity * 1.6, 1.0); }
+void main() { vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; float a = (1.0 - smoothstep(0.0, 1.0, d)); gl_FragColor = vec4(uColor * a * a * vA * uIntensity * 0.9, 1.0); }
 `;
 
 function coneGeometry(segments = 32) {
@@ -155,7 +155,7 @@ function coneGeometry(segments = 32) {
   return g;
 }
 
-const MOTES = 260;
+const MOTES = 180;
 
 export class Beam {
   constructor(scene) {

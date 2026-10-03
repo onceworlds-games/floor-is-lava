@@ -64,8 +64,13 @@ void main() {
   col += uFlash * vec3(0.55, 0.7, 1.0) * ((0.25 + 0.75 * cover) * 0.22 + near * (0.6 + 1.6 * cover) * 1.3);
   // Dawn: amber at the horizon in the east, pale above; the clouds' bellies catch the gold.
   float east = 0.6 + 0.4 * max(0.0, d.x);
-  vec3 dawn = mix(vec3(1.0, 0.5, 0.26) * 0.9 * east, vec3(0.16, 0.22, 0.34), smoothstep(0.0, 0.5, h));
-  dawn = mix(dawn, vec3(1.0, 0.62, 0.42) * (0.35 + edge * 0.8), cover * 0.75);
+  vec3 dawn = mix(vec3(1.0, 0.42, 0.14) * 0.85 * east, vec3(0.52, 0.34, 0.3), smoothstep(0.0, 0.12, h));
+  dawn = mix(dawn, vec3(0.07, 0.11, 0.22), smoothstep(0.08, 0.55, h));
+  dawn = mix(dawn, vec3(1.0, 0.5, 0.36) * (0.25 + edge * 0.9) * (0.4 + 0.6 * east), cover * 0.8);
+  // The sun itself, just up, and the glow round it.
+  vec3 sunDir = normalize(vec3(0.951, 0.118, -0.285));
+  float sd = distance(d, sunDir);
+  dawn += (smoothstep(0.05, 0.035, sd) * vec3(6.0, 4.2, 2.4) + exp(-sd * sd * 28.0) * vec3(1.6, 0.8, 0.36) + exp(-sd * sd * 4.0) * vec3(0.35, 0.16, 0.06)) * (1.0 - cover * 0.45);
   col = mix(col, dawn, uDawn);
   gl_FragColor = vec4(col, 1.0);
 }

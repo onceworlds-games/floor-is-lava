@@ -132,48 +132,72 @@ export async function runPoster(kind) {
     const p = shipPosOf(st, barge);
     spot(st, p.x, p.z, 16, 'white');
     stand(st, 'lantern');
-    const a = Math.atan2(p.x, p.z) - 2.15;
-    camera = { pos: new THREE.Vector3(Math.sin(a) * 105, 6, Math.cos(a) * 105), target: new THREE.Vector3(Math.sin(a + 0.5) * 20, H * 0.75, Math.cos(a + 0.5) * 20) };
-    strike = { x: -Math.sin(a) * 120 + Math.cos(a) * 40, z: -Math.cos(a) * 120 - Math.sin(a) * 40 };
-    strikeAt = 49;
+    const a = Math.atan2(p.x, p.z) - 2.4;
+    camera = { pos: new THREE.Vector3(Math.sin(a) * 92, 5, Math.cos(a) * 92), target: new THREE.Vector3(Math.sin(a + 0.6) * 18, H * 0.78, Math.cos(a + 0.6) * 18), fov: 56 };
+    strike = { x: -Math.sin(a) * 130 + Math.cos(a) * 55, z: -Math.cos(a) * 130 - Math.sin(a) * 55 };
+    strikeAt = 46;
     keep = () => {
       barge.guided = 6;
     };
   } else if (kind === 'thumb3') {
-    // The Kraken on the tower, the hard white pool on it, a harpoon streaking down from the gallery.
-    st = nightFor('gale', 9);
-    const k = spawnHostile(st, { type: 'kraken', tell: 0 });
-    k.st = 'grip';
-    k.x = 14;
-    k.z = 20;
-    shipAt(st, 'cutter', 'Saltire', 170, 5);
-    spot(st, 14, 20, 8, 'white');
-    st.shots.push({ id: 'p1', x: 14, z: 20, life: 0.3 });
+    // Night twelve: the Tide Titan out of the sea, its eyes burning, the beam hard on its face; a cutter running past.
+    st = nightFor('thunder', 12);
+    const t = spawnHostile(st, { type: 'titan', tell: 0 });
+    t.st = 'fight';
+    t.tellLeft = 0;
+    t.phase = 1;
+    t.x = 6;
+    t.z = 130;
+    const cutter = shipAt(st, 'cutter', 'Saltire', 95, 4);
+    cutter.guided = 6;
+    spot(st, 6, 118, 15, 'white');
     stand(st, 'gallery');
-    input.pitch = -0.55;
-    input.yaw = 0.1;
-    strikeAt = 30;
-    strike = { x: 120, z: 180 };
+    camera = { pos: new THREE.Vector3(-26, H + 7, -30), target: new THREE.Vector3(4, 18, 120), fov: 52 };
+    strikeAt = 45;
+    strike = { x: 120, z: 260 };
     keep = () => {
-      k.life = 40;
-      for (const sh of st.shots) sh.life = 0.3;
+      t.st = 'fight';
+      t.phase = 1;
+      t.phaseLeft = 60;
+      cutter.guided = 6;
     };
   } else {
-    // Dawn: the storm spent, the lamp still burning, ships coming home through gold water.
+    // Dawn: the storm spent, the sun just up, ships coming home along its road of gold past the tower.
     st = nightFor('rain', 7);
-    const a = shipAt(st, 'ferry', 'Lisbet', 150, -3, 200);
-    const b = shipAt(st, 'barge', 'Marram', 105, 4, 200);
-    shipAt(st, 'smack', 'Tern', 70, 2, 200);
-    a.guided = 6;
-    b.guided = 6;
-    st.weather = { ...st.weather, rain: 0, storm: 0.25, fog: 0.15, vis: 0.85 };
+    st.weather = { ...st.weather, rain: 0, storm: 0.22, fog: 0.1, vis: 0.9 };
+    // The stretch of the channel that lies toward the sunrise.
+    const sunAz = Math.atan2(0.951, -0.285);
+    let bestS = 0;
+    let bestD = Infinity;
+    for (let s = 0; s < st.route.L; s += 4) {
+      const ship = { s, d: 0 };
+      const p = shipPosOf(st, ship);
+      let da = Math.atan2(p.x, p.z) - sunAz;
+      da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da)));
+      if (da < bestD) {
+        bestD = da;
+        bestS = s;
+      }
+    }
+    const put = (type, name, ds, d) => {
+      const ship = spawnShip(st, { type, name, d });
+      ship.s = Math.max(0, Math.min(st.route.L - 1, bestS + ds));
+      ship.seen = 1;
+      return ship;
+    };
+    put('ferry', 'Lisbet', -95, -2);
+    put('barge', 'Marram', 70, 3);
+    put('smack', 'Tern', -160, 1);
     st.phase = 'dawn';
     st.dawnLeft = 0.01;
-    const bp = shipPosOf(st, b);
-    spot(st, bp.x, bp.z, 26, 'amber');
-    stand(st, 'lantern');
+    st.beam.mode = 'sweep';
+    st.beam.sweepAz = sunAz + 1.2;
+    stand(st, 'gallery');
     view.dawn = 1;
-    camera = { pos: new THREE.Vector3(-30, H + 4, 26), target: new THREE.Vector3(bp.x * 0.8, 2, bp.z * 0.8) };
+    // From the sea to the west: the tower dark against the sunrise, the gold road running to it.
+    const sx = 0.951;
+    const sz = -0.285;
+    camera = { pos: new THREE.Vector3(-sx * 105 - sz * 25, 7, -sz * 105 + sx * 25), target: new THREE.Vector3(sx * 30 + sz * 18, H * 0.55, sz * 30 - sx * 18), fov: 50 };
     keep = () => {
       st.phase = 'dawn';
       st.dawnLeft = 0.01;

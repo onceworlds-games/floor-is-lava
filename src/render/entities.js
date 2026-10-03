@@ -398,25 +398,61 @@ export class Entities {
       group.add(fog, cap);
       v.fog = fog;
     } else if (h.type === 'kraken' || h.type === 'titan') {
-      const segs = h.type === 'kraken' ? 12 : 7;
-      const arms = h.type === 'kraken' ? 1 : 2;
+      // Tentacles: tapering segments with a pale row of suckers on the inner side; the Kraken's wraps the tower.
+      const kraken = h.type === 'kraken';
+      const segs = kraken ? 16 : 7;
+      const arms = kraken ? 1 : 2;
+      const base = kraken ? 2.4 : 7;
+      const segH = kraken ? 3.0 : 14;
       v.arms = [];
+      const sucker = paint(new THREE.SphereGeometry(1, 6, 4), 0x8f7f7c, 0xc7b4ae);
       for (let a = 0; a < arms; a++) {
         const arm = [];
         for (let i = 0; i < segs; i++) {
-          const r0 = (h.type === 'kraken' ? 2.2 : 7) * (1 - i / segs) + 0.3;
-          const r1 = (h.type === 'kraken' ? 2.2 : 7) * (1 - (i + 1) / segs) + 0.3;
-          const seg = new THREE.Mesh(paint(new THREE.CylinderGeometry(r1, r0, h.type === 'kraken' ? 3.2 : 14, 7), 0x1a2a2c, 0x3e6a66), this.mat);
+          const k0 = 1 - i / segs;
+          const k1 = 1 - (i + 1) / segs;
+          const r0 = base * k0 ** 0.8 + 0.25;
+          const r1 = base * k1 ** 0.8 + 0.25;
+          const seg = new THREE.Mesh(paint(new THREE.CylinderGeometry(r1, r0, segH * 1.05, 12, 1, true), 0x0a1a1c, 0x1f4440), this.matSmooth);
+          // A joint ball at the base hides the seam when the arm bends.
+          const joint = new THREE.Mesh(paint(new THREE.SphereGeometry(r0, 12, 8), 0x0a1a1c, 0x183836), this.matSmooth);
+          joint.position.y = -segH * 0.5;
+          seg.add(joint);
+          for (const yy of [-0.25, 0.22]) {
+            const sk = new THREE.Mesh(sucker, this.matSmooth);
+            const rr = (r0 + r1) / 2;
+            sk.scale.set(rr * 0.32, rr * 0.18, rr * 0.32);
+            sk.position.set(rr * 0.9, yy * segH, 0);
+            seg.add(sk);
+          }
           group.add(seg);
           arm.push(seg);
         }
         v.arms.push(arm);
       }
       if (h.type === 'titan') {
-        const dome = new THREE.Mesh(paint(new THREE.SphereGeometry(42, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0x08141a, 0x1a3338), this.mat);
+        // A hill of a back out of the sea: lumpy, ridged with spines, crusted pale at the crown.
+        const geo = new THREE.SphereGeometry(42, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const y = pos.getY(i);
+          const z = pos.getZ(i);
+          const bump = 1 + 0.07 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17 - y * 0.2) + 0.04 * Math.sin(x * 0.6 + y * 0.5);
+          pos.setXYZ(i, x * bump, y * bump * 0.85, z * bump);
+        }
+        geo.computeVertexNormals();
+        const dome = new THREE.Mesh(paint(geo, 0x050d10, 0x23403e), this.matSmooth);
         dome.position.y = -6;
         group.add(dome);
         v.dome = dome;
+        for (let i = 0; i < 9; i++) {
+          const spine = new THREE.Mesh(paint(new THREE.ConeGeometry(2.2 - i * 0.12, 9 - Math.abs(i - 4) * 0.9, 5), 0x0a1a1c, 0x8a9a92), this.matSmooth);
+          const a = -0.9 + (i / 8) * 1.8;
+          spine.position.set(Math.sin(a) * 30 * 0.4, 28 + Math.cos(a) * 4 - Math.abs(i - 4) * 1.2, Math.cos(a) * 30 * 0.4 - 6);
+          spine.rotation.set(-0.35, 0, Math.sin(a) * 0.4);
+          group.add(spine);
+        }
       }
     } else if (h.type === 'moths') {
       return null;
@@ -507,17 +543,25 @@ export class Entities {
         v.fog.material.uniforms.uCentre.value.set(h.x, 0, h.z);
       } else if (h.type === 'kraken') {
         v.group.visible = !tell;
-        this.layArm(v.arms[0], h.x, h.z, 0, this.site.towerHeight - 7, 0, time, 3.6, storm, 1);
+        this.layArm(v.arms[0], h.x, h.z, 0, this.site.towerHeight - 9, 0, time, 3.0, storm, 1, 6.2);
         if (tell) this.glow(h.x, this.waterY(h.x, h.z, storm) + 0.3, h.z, 0.5, 0.75, 0.7, 14 + 6 * Math.sin(time * 12));
       } else if (h.type === 'titan') {
         v.group.visible = !tell;
         v.group.position.set(h.x, this.waterY(h.x, h.z, storm) - 2, h.z);
         const y = v.group.position.y;
-        // Eyes always; arms in phase two; the maw and lures in phase three.
-        const eye = h.phase === 1 ? 1 : 0.5;
-        const pulse = 0.7 + 0.3 * Math.sin(time * 2);
-        this.glow(h.x - 12, y + 34, h.z, 1 * eye, 0.6 * eye * pulse, 0.2 * eye, 22);
-        this.glow(h.x + 12, y + 34, h.z, 1 * eye, 0.6 * eye * pulse, 0.2 * eye, 22);
+        // It faces the tower. Eyes always (blazing while their face is up); arms in phase two; the maw and lures in three.
+        const fd = Math.hypot(h.x, h.z) || 1;
+        const fx = -h.x / fd;
+        const fz = -h.z / fd;
+        v.group.rotation.y = Math.atan2(fx, fz);
+        const eye = h.phase === 1 ? 1.6 : 0.7;
+        const pulse = 0.75 + 0.25 * Math.sin(time * 2);
+        for (const sgn of [-1, 1]) {
+          const ex = h.x + fx * 33 + fz * sgn * 11;
+          const ez = h.z + fz * 33 - fx * sgn * 11;
+          this.glow(ex, y + 24, ez, 1.8 * eye, 0.62 * eye * pulse, 0.12 * eye, 30);
+          this.glow(ex, y + 24, ez, 1.4 * eye, 1.0 * eye, 0.6 * eye, 9);
+        }
         for (let a = 0; a < 2; a++) {
           const arm = v.arms[a];
           const show = h.phase === 2;
@@ -533,13 +577,17 @@ export class Entities {
     for (const id of [...this.hostiles.keys()]) if (!seen.has(id)) this.removeVisual(this.hostiles, id);
   }
 
-  /** Lays segments along a writhing curve from the water (x, z) up toward the tower. */
-  layArm(segs, x, z, tx, ty, tz, time, segLen, storm, bend) {
+  /**
+   * Lays segments along a writhing curve from the water (x, z) up toward the tower. With `wrap` (a radius), once the
+   * arm reaches the tower it coils round it at that radius instead of going through it.
+   */
+  layArm(segs, x, z, tx, ty, tz, time, segLen, storm, bend, wrap = 0) {
     const n = segs.length;
     const y0 = this.waterY(x, z, storm);
     let px = x;
     let py = y0 - 1;
     let pz = z;
+    let coiling = false;
     for (let i = 0; i < n; i++) {
       const t = i / n;
       const toX = tx - px;
@@ -547,9 +595,21 @@ export class Entities {
       const toZ = tz - pz;
       const len = Math.hypot(toX, toY, toZ) || 1;
       const wob = Math.sin(time * 1.7 + i * 0.9) * 0.5 * bend;
-      const dx = (toX / len) * (0.5 + t * 0.5) + wob * 0.3;
-      const dy = 1 - t * 0.8 + Math.cos(time * 1.3 + i) * 0.2 * bend;
-      const dz = (toZ / len) * (0.5 + t * 0.5) + Math.cos(time * 1.9 + i * 0.7) * 0.5 * bend;
+      let dx = (toX / len) * (0.5 + t * 0.5) + wob * 0.3;
+      let dy = 1 - t * 0.8 + Math.cos(time * 1.3 + i) * 0.2 * bend;
+      let dz = (toZ / len) * (0.5 + t * 0.5) + Math.cos(time * 1.9 + i * 0.7) * 0.5 * bend;
+      if (wrap > 0) {
+        const rx = px - tx;
+        const rz = pz - tz;
+        const rd = Math.hypot(rx, rz) || 1;
+        if (rd < wrap + 2.5) coiling = true;
+        if (coiling) {
+          // Round the tower: along its circumference, pulled back to the wrap radius, climbing a little.
+          dx = -rz / rd + (rx / rd) * (wrap - rd) * 0.4 + wob * 0.1;
+          dz = rx / rd + (rz / rd) * (wrap - rd) * 0.4;
+          dy = 0.18 + Math.sin(time * 1.1 + i) * 0.05 * bend;
+        }
+      }
       const dl = Math.hypot(dx, dy, dz) || 1;
       const nx = px + (dx / dl) * segLen;
       const ny = py + (dy / dl) * segLen;

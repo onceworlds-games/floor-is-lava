@@ -94,8 +94,19 @@ export class Tower {
     }
     const lampFloor = this.mesh(cyl(3.3, 3.5, 0.3, 24, C.iron, C.iron));
     lampFloor.position.y = H - 1.25;
-    const roof = this.mesh(cyl(0.3, 3.9, 2.4, 12, C.deep, C.deep));
+    // The roof: dark iron outside, a cream-painted ceiling inside with brass rafters, so the lamp lights it warm.
+    const roof = this.mesh(cyl(0.3, 3.9, 2.4, 12, 0x9c8c6c, C.deep));
     roof.position.y = H + 3.6;
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + 0.3;
+      const rafter = this.mesh(box(3.3, 0.1, 0.09, C.brassDark, C.brass));
+      rafter.position.set(Math.cos(a) * 1.75, H + 2.42, Math.sin(a) * 1.75);
+      rafter.rotation.y = -a;
+      rafter.rotation.z = 0.0;
+    }
+    const ring = this.mesh(paint(new THREE.TorusGeometry(3.2, 0.07, 6, 32), C.brass, C.brassDark), this.matSmooth);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = H + 2.42;
     const finial = this.mesh(paint(new THREE.SphereGeometry(0.35, 8, 6), C.brass), this.matSmooth);
     finial.position.y = H + 5;
     const innerRail = this.mesh(paint(new THREE.TorusGeometry(2.4, 0.04, 6, 32), C.brass, C.brass), this.matSmooth);
@@ -111,7 +122,7 @@ export class Tower {
     this.lampSprite.scale.set(2.2, 2.2, 1);
     this.lampSprite.position.y = H + 0.35;
     this.group.add(this.lampSprite);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0xdff4ee, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
     for (let i = 0; i < 5; i++) {
       const r = 0.42 + i * 0.07;
       const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.025 + i * 0.005, 5, 36), ringMat);

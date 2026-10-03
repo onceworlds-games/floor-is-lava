@@ -44,6 +44,11 @@ export class Hints {
     if (this.active) {
       const h = this.active;
       this.timer += dt;
+      if (!h.when(state, me)) {
+        // The moment passed (the keeper left the room, the threat went): drop it quietly, ask again later.
+        this.active = null;
+        return null;
+      }
       if (h.done(state, me) || this.timer > 10) {
         if (this.timer > 10) this.cool[h.id] = this.clock + 20;
         this.active = null;
