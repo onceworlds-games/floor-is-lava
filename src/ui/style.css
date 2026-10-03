@@ -1,0 +1,108 @@
+/* Palette: abyss #070c15, deep #0e2234, teal #35b6a6, amber #f0a63a, brass #7a4f16, beam #eaf4ff, danger #d9432f. */
+@font-face { font-family: 'Ledger'; src: url('../fonts/display.woff2') format('woff2'); font-weight: 900; font-display: swap; }
+@font-face { font-family: 'Ledger'; src: url('../fonts/display-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Plain'; src: url('../fonts/ui.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Plain'; src: url('../fonts/ui-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+:root {
+  --abyss: #070c15; --deep: #0e2234; --teal: #35b6a6; --amber: #f0a63a; --brass: #7a4f16; --beam: #eaf4ff; --danger: #d9432f;
+  --ink: #e9e2d2; --dim: #a79f8c; --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--abyss); color: var(--ink); font-family: 'Plain', 'Barlow Condensed', 'Arial Narrow', sans-serif; font-size: 18px; touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+#gl, #hud { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { pointer-events: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.hide { display: none !important; }
+
+/* Screens: a full cover with one hero. */
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); text-align: center; }
+.screen.dark { background: rgba(7, 12, 21, 0.82); }
+.screen.veil { background: linear-gradient(180deg, rgba(7, 12, 21, 0.2), rgba(7, 12, 21, 0.78)); }
+h1, h2, h3 { font-family: 'Ledger', 'Big Shoulders Stencil Display', Impact, sans-serif; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; line-height: 0.95; }
+h1 { font-size: clamp(56px, 13vw, 128px); color: var(--amber); text-shadow: 0 0 40px rgba(240, 166, 58, 0.35), 0 4px 0 #3b2306; }
+h2 { font-size: clamp(30px, 6vw, 54px); color: var(--ink); }
+h3 { font-size: 22px; color: var(--amber); }
+.sub { font-family: 'Ledger'; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--teal); font-size: 15px; margin-top: 10px; }
+.big { font-family: 'Ledger'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; font-size: 28px; min-width: 240px; min-height: 64px; padding: 14px 36px; margin-top: 28px; border: 3px solid var(--amber); border-radius: 6px; background: linear-gradient(180deg, #2a1a08, #150d04); color: var(--amber); box-shadow: 0 0 0 3px #150d04, 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 24px rgba(240, 166, 58, 0.15); transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.big:active { transform: translateY(2px) scale(0.98); }
+.big.teal { border-color: var(--teal); color: var(--teal); }
+.row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+.btn { font-family: 'Ledger'; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 18px; min-height: 48px; min-width: 48px; padding: 10px 18px; border: 2px solid #5a3b14; border-radius: 6px; background: #120d07; color: var(--ink); }
+.btn.on { border-color: var(--amber); color: var(--amber); background: #22160a; }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.key { display: inline-block; font-size: 12px; border: 1px solid var(--dim); border-radius: 4px; padding: 0 5px; margin-left: 8px; color: var(--dim); letter-spacing: 0; vertical-align: middle; }
+
+/* Ledger: the keeper's book. */
+.book { width: min(94vw, 760px); max-height: calc(100vh - 150px - var(--sat) - var(--sab)); overflow: auto; background: linear-gradient(180deg, #1a1409, #110c06); border: 3px solid #4a3212; border-radius: 8px; padding: 18px 22px 22px; text-align: left; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(0, 0, 0, 0.5); }
+.book .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-bottom: 2px solid #4a3212; padding-bottom: 8px; margin-bottom: 10px; }
+.book h3 { margin: 14px 0 8px; }
+.book .entry { font-family: 'Ledger'; font-weight: 700; font-size: 20px; color: var(--amber); letter-spacing: 0.03em; line-height: 1.25; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs .btn { font-size: 15px; padding: 6px 12px; min-height: 44px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.card { border: 2px solid #4a3212; border-radius: 6px; padding: 10px 12px; background: rgba(0, 0, 0, 0.25); min-height: 44px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.card.pick { cursor: pointer; }
+.card.pick:active { background: #22160a; }
+.card.on { border-color: var(--amber); background: #22160a; }
+.card.locked { opacity: 0.45; }
+.card .name { font-family: 'Ledger'; font-weight: 700; font-size: 20px; color: var(--amber); letter-spacing: 0.03em; }
+.card .give { color: var(--teal); }
+.card .cost { color: var(--danger); }
+.card .price { color: var(--ink); font-weight: 700; margin-top: auto; }
+.card .price.no { color: var(--dim); }
+.stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #3a2a12; }
+.stat b { color: var(--amber); }
+.coins { font-family: 'Ledger'; font-weight: 900; font-size: 26px; color: var(--amber); }
+.line { color: var(--dim); font-size: 16px; }
+
+/* Lobby strip room at the bottom (the platform's Ready / Start bar). */
+.lobbyroom { padding-bottom: calc(88px + var(--sab)); }
+
+/* Hints, labels in the world. */
+.hint { position: absolute; left: 50%; bottom: calc(24% + var(--sab)); transform: translateX(-50%); font-family: 'Ledger'; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-size: 22px; color: var(--beam); text-shadow: 0 2px 8px #000; pointer-events: none; white-space: nowrap; animation: rise 0.4s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.toast { position: absolute; left: 50%; top: calc(64px + var(--sat)); transform: translateX(-50%); font-family: 'Ledger'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 30px; color: var(--amber); text-shadow: 0 2px 10px #000; pointer-events: none; white-space: nowrap; animation: rise 0.3s ease-out; }
+.toast.bad { color: var(--danger); }
+.toast.good { color: var(--teal); }
+.watch { position: absolute; top: calc(12px + var(--sat)); left: 50%; transform: translateX(-50%); font-family: 'Ledger'; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; font-size: 14px; color: var(--teal); pointer-events: none; }
+
+/* Station tabs (top centre) and the radio card. */
+.stations { position: absolute; top: calc(8px + var(--sat)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+.stations .btn { min-width: 56px; min-height: 44px; padding: 4px 10px; font-size: 14px; background: rgba(7, 12, 21, 0.7); }
+.stations .btn.on { background: #22160a; }
+.radio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 420px); background: linear-gradient(180deg, #1a1409, #110c06); border: 3px solid #4a3212; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+.radio .ships { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.radio .ships .btn { display: flex; justify-content: space-between; text-transform: none; letter-spacing: 0.02em; font-family: 'Plain'; }
+.radio .orders { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chartbox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 560px); aspect-ratio: 1; max-height: calc(100vh - 120px - var(--sat) - var(--sab)); background: #0a1a26; border: 3px solid #4a3212; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.chartbox canvas { width: 100%; height: 100%; display: block; }
+.close { position: absolute; right: 8px; top: 8px; min-width: 44px; min-height: 44px; }
+
+/* Focus slider on touch (lantern room). */
+.focus { position: absolute; right: calc(14px + var(--sar)); top: 40%; width: 44px; height: 160px; }
+.focus input { -webkit-appearance: none; appearance: none; width: 160px; height: 44px; transform: rotate(-90deg) translate(-58px, -58px); background: transparent; }
+.focus input::-webkit-slider-runnable-track { height: 8px; background: #4a3212; border-radius: 4px; }
+.focus input::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; margin-top: -12px; border-radius: 50%; background: var(--amber); border: 3px solid #150d04; }
+
+@media (max-width: 480px) {
+  body { font-size: 16px; }
+  .book { padding: 12px 14px 16px; }
+  .grid { grid-template-columns: 1fr 1fr; }
+  .card .name { font-size: 17px; }
+  .big { font-size: 24px; min-width: 200px; }
+  .hint { font-size: 18px; }
+  .toast { font-size: 24px; }
+}
+@media (max-height: 420px) {
+  .book { max-height: calc(100vh - 100px); padding: 8px 12px 12px; }
+  h1 { font-size: clamp(40px, 10vh, 72px); }
+  .big { margin-top: 12px; min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint, .toast { animation: none; }
+}

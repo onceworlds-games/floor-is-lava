@@ -24,7 +24,7 @@ export function createNight(cfg) {
   const seed = hashSeed(cfg.seed ?? 1, night);
   const rng = { s: seed };
   const state = {
-    v: 1, seed: cfg.seed ?? 1, night, phase: 'dusk', t: 0, tick: 0, duskLeft: DUSK, dawnLeft: 0, result: null,
+    v: 1, seed: cfg.seed ?? 1, night, phase: 'dusk', t: 0, tick: 0, steps: 0, duskLeft: DUSK, dawnLeft: 0, result: null,
     rng, mods, weather, site: season.site || 'skerry-rock', route: null, tl: null, nextEv: 0, pending: [], counter: 1, evMut: {}, barked: [],
     beam: makeBeam(mods),
     res: { oil: mods.oilMax, oilMax: mods.oilMax, power: mods.powerMax, integ: mods.startInteg, air: 30, harpoons: mods.harpoons, flares: mods.flares, spareLens: mods.spareLens, oilCans: mods.oilCans, reload: 0, rep: Number.isFinite(season.rep) ? season.rep : 60, coins: 0 },
@@ -195,6 +195,7 @@ export function stepNight(state, dt = TICK) {
   hydrate(state);
   state.fx.length = 0;
   if (state.phase === 'over') return state;
+  state.steps++;
   if (state.phase === 'dusk') {
     state.duskLeft = Math.max(0, state.duskLeft - dt);
     stepCrew(state, dt);

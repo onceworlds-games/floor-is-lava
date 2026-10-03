@@ -113,16 +113,7 @@ export function endNight(season, nightState, profile) {
   else if (season.daily) season.over = 'done';
   else if (season.night >= LAST_NIGHT && result === 'dawn' && !season.endless) season.over = 'won';
   else if (season.night >= LAST_NIGHT && result === 'disaster' && !season.endless) season.over = 'lost';
-  if (profile) {
-    profile.shipsSaved += st.saved;
-    profile.nightsTotal += result === 'dawn' ? 1 : 0;
-    if (result === 'dawn') profile.nights = Math.max(profile.nights, season.night);
-    for (const type of Object.keys(st.survived)) {
-      profile.almanac[type] = profile.almanac[type] || { seen: 0, read: 0 };
-      profile.almanac[type].seen++;
-    }
-    if (ledger.titan) profile.titans++;
-  }
+  if (profile) creditNight(profile, ledger);
   // Next night's offers (also when the run is over: the screens still render).
   season.night++;
   season.charter = null;
@@ -130,6 +121,21 @@ export function endNight(season, nightState, profile) {
   season.relicOffer = season.daily ? [] : offerRelics(season);
   season.charterOffer = season.daily ? [] : offerCharters(season);
   return ledger;
+}
+
+/** Banks a finished night into a player's own record (every participant, not only the host). */
+export function creditNight(profile, ledger) {
+  if (!profile || !ledger) return;
+  profile.shipsSaved += Math.max(0, ledger.saved | 0);
+  if (ledger.result === 'dawn') {
+    profile.nightsTotal++;
+    profile.nights = Math.max(profile.nights, ledger.night | 0);
+  }
+  for (const type of ledger.survived || []) {
+    profile.almanac[type] = profile.almanac[type] || { seen: 0, read: 0 };
+    profile.almanac[type].seen++;
+  }
+  if (ledger.titan) profile.titans++;
 }
 
 function entryFor(season, nightState) {
