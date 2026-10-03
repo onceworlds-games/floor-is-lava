@@ -92,7 +92,8 @@ export class Hud {
     const touch = controls.touch;
     const small = w < 520;
     const r = small ? 15 : 20;
-    const top = small ? 92 : 64;
+    // On a narrow phone the station tabs take the row under the platform's buttons, so the dials sit below them.
+    const top = small ? 136 : 64;
     // Dials along the top right: oil, power, heat, tower.
     const res = state.res;
     const dials = [
@@ -314,9 +315,11 @@ export class Hud {
 
 Hud.prototype.titanBar = function titanBar(t, w, small) {
   const c = this.ctx;
-  const bw = Math.min(small ? 220 : 340, w - 40);
-  const x = (w - bw) / 2;
-  const y = small ? 62 : 66;
+  const bw = Math.min(small ? 200 : 340, w - 40);
+  // On a narrow phone it keeps to the left, clear of the mini chart on the right.
+  const x = small ? 12 : (w - bw) / 2;
+  const cx = x + bw / 2;
+  const y = small ? 200 : 66;
   const face = t.phase === 1 ? 'EYES' : t.phase === 2 ? 'ARMS' : 'MAW';
   const want = t.phase === 1 ? 'HARD WHITE LIGHT' : t.phase === 2 ? `HARPOONS ${Math.min(TITAN.hits, Math.floor(t.hit))}/${TITAN.hits}` : `HORN ${Math.min(TITAN.blasts, t.blasts)}/${TITAN.blasts} · FLARES ${Math.min(TITAN.lures, t.flares)}/${TITAN.lures}`;
   const k = t.phase === 1 ? t.lightAcc / TITAN.eyes : t.phase === 2 ? t.hit / TITAN.hits : (Math.min(TITAN.blasts, t.blasts) + Math.min(TITAN.lures, t.flares)) / (TITAN.blasts + TITAN.lures);
@@ -324,7 +327,7 @@ Hud.prototype.titanBar = function titanBar(t, w, small) {
   c.textBaseline = 'alphabetic';
   c.font = `900 ${small ? 13 : 15}px Ledger, sans-serif`;
   c.fillStyle = DANGER;
-  c.fillText(`THE TIDE TITAN · ${face}`, w / 2, y);
+  c.fillText(`THE TIDE TITAN · ${face}`, cx, y);
   c.fillStyle = 'rgba(7,12,21,0.75)';
   c.fillRect(x, y + 6, bw, 8);
   c.fillStyle = AMBER;
@@ -337,7 +340,7 @@ Hud.prototype.titanBar = function titanBar(t, w, small) {
   c.fillRect(x, y + 16, bw * Math.max(0, Math.min(1, t.phaseLeft / TITAN.face)), 2);
   c.font = `700 ${small ? 11 : 12}px Plain, sans-serif`;
   c.fillStyle = INK;
-  c.fillText(want, w / 2, y + 32);
+  c.fillText(want, cx, y + 32);
 };
 
 export { drawChart, SHIPS, poolCentre };

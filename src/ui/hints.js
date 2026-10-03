@@ -1,7 +1,7 @@
 // The first night teaches in context: one short hint at the moment it matters, each shown until its
 // condition is met or it times out, remembered in the profile so it stops after a few nights.
 const HINTS = [
-  { id: 'spot', when: (s, me) => me.st === 'lantern' && s.beam.mode === 'sweep' && s.t > 2, done: (s) => s.beam.mode === 'spot', text: (t) => (t ? 'MODE: SPOT' : 'SPACE: SPOT'), max: 3 },
+  { id: 'spot', when: (s, me) => me.st === 'lantern' && s.beam.mode === 'sweep' && s.ships.some((x) => x.st === 'sail'), done: (s) => s.beam.mode === 'spot', text: (t) => (t ? 'MODE: SPOT' : 'SPACE: SPOT'), max: 3 },
   { id: 'aim', when: (s, me) => me.st === 'lantern' && s.beam.mode === 'spot' && s.ships.some((x) => x.st === 'sail'), done: (s) => s.ships.some((x) => x.lit), text: (t) => (t ? 'DRAG ONTO THE SHIP' : 'AIM AT THE SHIP'), max: 3 },
   { id: 'hold', when: (s, me) => me.st === 'lantern' && s.ships.some((x) => x.lit), done: (s) => s.ships.some((x) => x.guided > 0), text: () => 'HOLD IT: GUIDED', max: 3 },
   { id: 'focus', when: (s, me) => me.st === 'lantern' && s.ships.some((x) => x.guided > 0) && s.beam.r > 16, done: (s) => s.beam.r <= 16, text: (t) => (t ? 'SLIDER: FOCUS' : 'WHEEL: FOCUS'), max: 2 },

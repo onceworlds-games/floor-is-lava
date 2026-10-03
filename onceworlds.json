@@ -21,7 +21,7 @@
     { "keys": ["Tab", "Shift+1-4"], "action": "Change station" },
     { "keys": ["A", "D", "W", "S"], "action": "Look around" }
   ],
-  "help": "Keep a ship in the light until it reads Guided and it steers back to the safe line. Amber quiets sirens, Blue halts false lights, Red burns the Drowned faster. Heat cracks the lens; oil and power run out. Gallery: harpoons, flares, the hammer. Watch room: radio, horn, crank. Survive twelve nights; spend the days on the tower. Friends take the other stations.",
+  "help": "Hold a ship in the light until its ring closes and it reads Guided: it steers back to the safe line. A dead engine needs the light, then a radio order. Amber quiets sirens, Blue halts false lights, Red burns the Drowned. Heat cracks the lens; oil and power run out. Gallery: harpoons, flares, the hammer. Watch room: radio, horn, crank. Twelve nights, then the Titan. Friends take the other stations.",
   "badges": [
     { "id": "first-light", "name": "First Light", "description": "Keep the lamp through night one.", "icon": "store/badges/first-light.png" },
     { "id": "safe-harbour", "name": "Safe Harbour", "description": "Ten ships home in one night.", "icon": "store/badges/safe-harbour.png" },

@@ -496,10 +496,23 @@ export class Screens {
     this.stationBar = null;
   }
 
-  showHint(text) {
-    if (this.hint && this.hint.textContent === text) return;
+  /** One short hint at the moment it matters; the cross beside it turns the first-night hints off for good. */
+  showHint(text, onSkip) {
+    if (this.hint && this.hint.dataset.text === text) return;
     this.hint?.remove();
-    this.hint = el('div', 'hint', text);
+    this.hint = el('div', 'hint');
+    this.hint.dataset.text = text;
+    this.hint.append(el('span', '', text));
+    if (onSkip) {
+      const x = el('button', 'hint-x', '×');
+      x.setAttribute('aria-label', 'No more hints');
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.click();
+        onSkip();
+      });
+      this.hint.append(x);
+    }
     this.root.append(this.hint);
   }
 
@@ -615,7 +628,7 @@ export class Screens {
 
   // ---- The end of a night, over the dawn.
   // The night's page, over the dawn: it settles low on the screen a moment after the bell, leaving the sunrise above.
-  nightOver(ledger, isHost, onContinue) {
+  nightOver(ledger, isHost, onContinue, onAgain = null) {
     const s = el('div', `screen nightover ${ledger.result === 'dawn' ? 'dawn' : 'lost'}`);
     const book = el('div', 'book');
     book.style.width = 'min(94vw, 520px)';
@@ -643,6 +656,8 @@ export class Screens {
     let morning = null;
     if (isHost) row.append((morning = button('Morning', 'on', () => (this.click(), onContinue()), 'Enter')));
     else row.append(el('div', 'line', 'Waiting for the keeper.'));
+    // A lost season: straight into a new one from here.
+    if (isHost && onAgain) row.append(button('New season', '', () => (this.click(), onAgain())));
     book.append(row);
     s.append(book);
     this.show('over', s);

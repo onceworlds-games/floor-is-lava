@@ -7,8 +7,10 @@ Play it at [onceworlds.com/play/watchlight](https://onceworlds.com/play/watchlig
 ## How to play
 
 Every night, ships sail blind toward the reef and things in the water hate the light (some love it). Keep a ship in
-the lamp's pool until it reads **Guided** and it steers back to the safe line. Between nights you spend what you saved:
-the shop, a relic draft, a charter for the next night, the Almanac. Survive the season; the Tide Titan waits on night twelve.
+the lamp's pool until the ring round it closes and it reads **Guided**: it steers back to the safe line. A ship whose
+engine dies needs the light first, then a radio order, before it founders. Between nights you spend what you saved:
+the shop, a relic draft, a charter for the next night, the Almanac. Survive the season; the Tide Titan waits on night
+twelve, and each of its three faces wants a different tool (hard light, harpoons, the horn and flares).
 
 Three stations, one keeper (or up to four friends):
 
@@ -34,7 +36,8 @@ station, and the station tabs sit at the top.
 
 - 12-night seasons with a 9-minute night built from an event deck (4 to 14 ships, 1 to 7 hostile events), a quiet minute
   and a moment of panic every night; six weathers; dusk, night, dawn and the day between.
-- Four friendly ship types with a drift-and-guidance model, radio orders, distress calls, wrecks and salvage crates.
+- Four friendly ship types with a drift-and-guidance model, radio orders, dead engines that founder if nobody answers,
+  wrecks and salvage crates.
 - Seven hostile kinds: the Drowned, Sirens, Mimics, the Tide-Wraith, moth swarms, the Kraken, lightning; the Tide Titan
   and its three faces on night twelve.
 - Oil, power, heat, tower integrity, reputation, coins; harpoons, flares, a spare lens, oil cans.
@@ -51,7 +54,9 @@ night up where it is, and a keeper alone can run every station.
 ## How it is built
 
 Vite and three.js, no downloaded art or sound: the sea, sky, tower, ships and creatures are procedural geometry and
-shaders; every sound is synthesized with Web Audio; the two fonts are bundled.
+shaders lit in linear light and tone-mapped at the end (with bloom on medium and high quality); the beam's shaft is
+the light scattered along each view ray inside its cone. Every sound is synthesized with Web Audio through one
+limiter; the two fonts are bundled.
 
 - `src/sim/`: the pure simulation (no DOM, seeded, fixed 50 ms steps, plain data): the route and reefs, the beam, ships,
   hostile things, the night's deck, the season, the keeper's record, scripted keepers for the balance harness.
@@ -70,7 +75,8 @@ npm test             # node --test
 npm run balance      # the headless balance harness (add --seeds 40 --relics)
 npm run build        # dist/
 npm run smoke        # the built game drives itself in headless Chrome
-npm run store        # captures the store art into store/ from the game's own poster scenes
+npm run store        # captures the store art into store/ from the game's own poster scenes, on the GPU
+                     # (SOFTWARE_GL=1 to use the software renderer on a machine without one)
 ```
 
 To try it with real multiplayer, deploy it to a local Onceworlds platform (`onceworlds deploy . --api http://localhost:8787`)

@@ -15,12 +15,17 @@ test('the first night teaches in order, remembers what it said and stops after a
   applyCommand(st, { k: 'light' }, 'me');
   for (let i = 0; i < 70; i++) stepNight(st);
   const me = st.crew.me;
+  assert.equal(hints.update(st, me, 0.05), null, 'nothing to say before there is a ship to light');
+  st.tl.events.length = 0;
+  spawnShip(st, { type: 'ferry', name: 'Test', d: 0 });
+  stepNight(st);
   assert.equal(hints.update(st, me, 0.05), 'SPACE: SPOT');
   assert.equal(new Hints(defaultProfile(), true).update(st, me, 0.05), 'MODE: SPOT');
+  // Its moment passes when the keeper leaves the lamp room: the hint goes, unspent.
+  me.st = 'watch';
+  assert.equal(hints.update(st, me, 0.05), null);
+  me.st = 'lantern';
   applyCommand(st, { k: 'mode', mode: 'spot' }, 'me');
-  stepNight(st);
-  assert.equal(hints.update(st, me, 0.05), null, 'done hints go away');
-  spawnShip(st, { type: 'ferry', name: 'Test', d: 0 });
   stepNight(st);
   assert.equal(hints.update(st, me, 0.05), 'AIM AT THE SHIP');
   assert.equal(profile.hints.spot, 1);

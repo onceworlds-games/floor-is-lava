@@ -41,7 +41,8 @@ export function buildTimeline(rng, { night, mods, weather }) {
   // Ships: arrivals spread across the night, in pairs for a convoy, with the hail before each.
   const ships = shipCount(night, mods);
   const weights = shipWeights(night).map((w) => (w.id === 'ferry' ? { ...w, w: w.w * mods.ferryWeightMul } : w));
-  const first = 25;
+  // Night one starts with a hail at once, so a new keeper has a ship to light within half a minute.
+  const first = night <= 1 ? 6 : 25;
   const last = Math.max(first + 30, len - 110);
   const slots = [];
   for (let i = 0; i < ships; i++) slots.push(first + ((last - first) * (i + range(rng, 0.15, 0.85))) / ships);

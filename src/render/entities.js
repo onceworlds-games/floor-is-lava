@@ -249,10 +249,17 @@ export class Entities {
     return v;
   }
 
+  /** Takes a thing off the water and frees what was made for it alone (shared hulls and materials stay). */
   removeVisual(map, id) {
     const v = map.get(id);
     if (!v) return;
     this.scene.remove(v.group);
+    const shared = new Set(Object.values(this.geos));
+    v.group.traverse((o) => {
+      if (o.geometry && !o.isSprite && !shared.has(o.geometry)) o.geometry.dispose(); // sprites share three's quad
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const m of mats) if (m !== this.mat && m !== this.matSmooth) m.dispose();
+    });
     map.delete(id);
   }
 
@@ -698,6 +705,7 @@ export class Entities {
     }
     for (let i = this.shots.length - 1; i >= 0; i--) if (!seen.has(this.shots[i].id)) {
       this.scene.remove(this.shots[i].line);
+      this.shots[i].line.geometry.dispose();
       this.shots.splice(i, 1);
     }
   }
