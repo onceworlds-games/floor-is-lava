@@ -105,7 +105,7 @@ export function lightAt(state, x, z, out = { I: 0, lens: 'white', sweep: false, 
   }
   if (out.I > 0) {
     for (const h of state.hostiles) {
-      if (h.type !== 'wraith' || h.state === 'gone') continue;
+      if (h.type !== 'wraith' || h.st !== 'move') continue;
       if (Math.hypot(x - h.x, z - h.z) < h.r) {
         let inHole = false;
         for (const hole of h.holes) if (Math.hypot(x - hole.x, z - hole.z) < hole.r) inHole = true;
@@ -138,7 +138,10 @@ export function stepLamp(state, dt) {
     b.wipeLeft = Math.max(0, b.wipeLeft - dt);
     if (b.wipeLeft === 0) {
       b.grit = 0;
-      for (const h of state.hostiles) if (h.type === 'moths' && h.state !== 'gone') h.state = 'gone';
+      for (const h of state.hostiles) if (h.type === 'moths' && h.st !== 'gone') {
+        h.st = 'gone';
+        state.fx.push({ k: 'moths-gone' });
+      }
       state.fx.push({ k: 'wiped' });
     }
   }

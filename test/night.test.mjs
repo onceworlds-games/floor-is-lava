@@ -250,3 +250,29 @@ test('a hidden tab: the night is stepped by ticks, so a long gap costs nothing a
   stepNight(st, TICK);
   assert.equal(st.t, before + TICK);
 });
+
+test('wiping the lens ends the moth swarm; a fog bank that has gone no longer eats the beam', async () => {
+  const { spawnHostile } = await import('../src/sim/hostiles.js');
+  const st = night({ night: 3 });
+  const moths = spawnHostile(st, { type: 'moths', tell: 0.1 });
+  for (let i = 0; i < 80; i++) stepNight(st);
+  assert.equal(moths.st, 'on');
+  assert.ok(st.beam.grit > 0.3, 'the swarm dirties the glass');
+  assert.ok(applyCommand(st, { k: 'wipe' }, 'p1'));
+  for (let i = 0; i < 60; i++) stepNight(st);
+  assert.equal(moths.st, 'gone', 'the rag clears the swarm, not only the grit');
+  for (let i = 0; i < 40; i++) stepNight(st);
+  assert.ok(st.beam.grit < 0.05, 'and the glass stays clean');
+  // A fog bank sitting on the pool dims it; once it is gone, the light comes back in full.
+  const w = spawnHostile(st, { type: 'wraith', u: 0.5, tell: 0.1 });
+  for (let i = 0; i < 4; i++) stepNight(st);
+  assert.ok(applyCommand(st, { k: 'mode', mode: 'spot' }, 'p1'));
+  st.beam.az = Math.atan2(w.x, w.z);
+  st.beam.dist = Math.hypot(w.x, w.z);
+  const inFog = lightAt(st, w.x, w.z).I;
+  w.st = 'gone';
+  const clear = lightAt(st, w.x, w.z).I;
+  assert.ok(clear > inFog * 2, `fog ${inFog.toFixed(2)} vs clear ${clear.toFixed(2)}`);
+  w.st = 'tell';
+  assert.equal(lightAt(st, w.x, w.z).I, clear, 'a bank that has not arrived yet does not dim either');
+});
