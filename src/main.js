@@ -9,7 +9,7 @@ import { Hints } from './ui/hints.js';
 import { AudioEngine } from './audio/engine.js';
 import { Input, touchControlsFor } from './input.js';
 import { loadProfile, bankSeason } from './sim/profile.js';
-import { newSeason, creditNight, buy, pickRelic, skipRelic, pickCharter, readAlmanac, scoreOf, goEndless, dailyFor } from './sim/season.js';
+import { newSeason, creditNight, buy, pickRelic, skipRelic, pickCharter, readAlmanac, scoreOf, goEndless, dailyFor, cleanSeason } from './sim/season.js';
 import { makeBot, stepBot } from './sim/bots.js';
 import { STATIONS, TICK } from './sim/night.js';
 import { maxDist } from './sim/beam.js';
@@ -44,6 +44,7 @@ async function boot() {
     },
     onNight: (state) => onNightState(state),
     onLedger: (ledger) => onLedger(ledger),
+    onRole: () => onRole(),
   });
   const joining = session.join();
   const view = new View(canvas);
@@ -74,7 +75,6 @@ async function boot() {
   G.profile = loadProfile(await saves.get('profile'));
   let savedSeason = validSeason(await saves.get('season'));
   await joining;
-  const room = session.room;
   view.setSite((session.season || savedSeason || {}).site || G.profile.site);
   G.hints = new Hints(G.profile, controls.touch);
 
@@ -93,20 +93,20 @@ async function boot() {
     }
   });
   onPlatformEvent('pause', () => {
-    if (room.players.size <= 1 && room.match.phase !== 'lobby' && session.isHost) {
-      session.safe(() => room.pauseMatch(true));
+    if (session.room.players.size <= 1 && session.room.match.phase !== 'lobby' && session.isHost) {
+      session.safe(() => session.room.pauseMatch(true));
       G.pausedByMenu = true;
     }
   });
   onPlatformEvent('resume', () => {
     if (G.pausedByMenu) {
       G.pausedByMenu = false;
-      session.safe(() => room.pauseMatch(false));
+      session.safe(() => session.room.pauseMatch(false));
     }
   });
 
   function validSeason(s) {
-    return s && typeof s === 'object' && s.v === 1 && Number.isFinite(s.night) && s.totals ? s : null;
+    return cleanSeason(s);
   }
 
   function saveProfile(force = false) {
@@ -136,7 +136,7 @@ async function boot() {
       if (over.keeper) G.profile.keeper = over.keeper;
       if (over.site) G.profile.site = over.site;
       if (over.asc !== undefined) G.profile.asc = over.asc;
-      G.season = newSeason({ keeper: G.profile.keeper, site: G.profile.site, asc: Math.min(G.profile.asc, G.profile.ascCleared), seed: (Math.random() * 1e9) >>> 0 });
+      G.season = newSeason({ keeper: G.profile.keeper, site: G.profile.site, asc: Math.min(G.profile.asc, G.profile.ascCleared), seed: (Math.random() * 1e9) >>> 0, owner: session.me?.id });
     }
     G.ledger = null;
     savedSeason = null;
@@ -148,9 +148,9 @@ async function boot() {
 
   function startDaily() {
     if (!session.isHost) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date(now()).toISOString().slice(0, 10);
     const d = dailyFor(today);
-    const daily = newSeason({ keeper: d.keeper, site: d.site, asc: 0, seed: d.seed, daily: d });
+    const daily = newSeason({ keeper: d.keeper, site: d.site, asc: 0, seed: d.seed, daily: d, owner: session.me?.id });
     daily.stash = G.season;
     G.season = daily;
     G.ledger = null;
@@ -162,8 +162,8 @@ async function boot() {
   // ---- Screens by phase.
   function dayCtx() {
     const s = G.season;
-    const today = new Date().toISOString().slice(0, 10);
-    const seats = Math.max(0, 4 - room.players.size);
+    const today = new Date(now()).toISOString().slice(0, 10);
+    const seats = Math.max(0, 4 - session.room.players.size);
     return { season: s, profile: G.profile, isHost: session.isHost, ledger: G.ledger, firstDay: s.night === 1 && s.totals.nights === 0 && !s.over, best: G.profile.best.score, dailyDone: G.profile.daily.date === today && G.profile.daily.done, canInvite: onPlatform && seats > 0, seats };
   }
 
@@ -171,7 +171,7 @@ async function boot() {
     G.season = session.season || G.season;
     if (!G.season) {
       if (session.isHost) {
-        G.season = savedSeason || newSeason({ keeper: G.profile.keeper, site: G.profile.site, asc: Math.min(G.profile.asc, G.profile.ascCleared), seed: (Math.random() * 1e9) >>> 0 });
+        G.season = savedSeason || newSeason({ keeper: G.profile.keeper, site: G.profile.site, asc: Math.min(G.profile.asc, G.profile.ascCleared), seed: (Math.random() * 1e9) >>> 0, owner: session.me?.id });
         session.setSeason(G.season, { save: !savedSeason });
       } else {
         screens.waiting('The keeper is coming');
@@ -187,7 +187,7 @@ async function boot() {
     if (!G.ledger && G.season.ledger && G.season.over) G.ledger = G.season.ledger;
     if (G.season.over) screens.tab = 'ledger';
     screens.day(dayCtx());
-    session.safe(() => room.hideLobby?.(false));
+    session.safe(() => session.room.hideLobby?.(false));
   }
 
   function showTitle() {
@@ -195,7 +195,7 @@ async function boot() {
     input.locked = true;
     controls.set(null);
     session.setPresence({ ph: 'title' });
-    session.safe(() => room.hideLobby?.(true));
+    session.safe(() => session.room.hideLobby?.(true));
     const hasSeason = Boolean(session.season || savedSeason);
     screens.title(hasSeason, () => {
       audio.start();
@@ -229,8 +229,8 @@ async function boot() {
     view.setSite(state.site);
     input.locked = false;
     G.lastStation = null;
-    session.safe(() => room.hideLobby?.(false));
-    if (G.phase === 'dusk') screens.dusk(state, session.isHost, room.players);
+    session.safe(() => session.room.hideLobby?.(false));
+    if (G.phase === 'dusk') screens.dusk(state, session.isHost);
     else screens.clearScreen();
     if (session.role === 'watch') screens.watching('Watching until dawn');
     if (test && session.isHost) {
@@ -240,27 +240,32 @@ async function boot() {
   }
 
   function onLedger(ledger) {
-    if (G.ledger && G.ledger.night === ledger.night && G.ledger.entry === ledger.entry) return;
+    if (G.phase === 'over' && G.ledger && G.ledger.night === ledger.night && G.ledger.entry === ledger.entry) return;
     G.ledger = ledger;
-    creditNight(G.profile, ledger);
-    if (session.state) {
-      G.stats = session.state.stats;
-      G.profile.strikes += session.state.stats.strikes || 0;
+    // Each night is banked once per keeper, even when a reload or a new host shows its ledger again.
+    const fresh = !ledger.mid || G.profile.credited !== ledger.mid;
+    if (fresh) {
+      G.profile.credited = ledger.mid || '';
+      creditNight(G.profile, ledger);
+      if (session.state) {
+        G.stats = session.state.stats;
+        G.profile.strikes += session.state.stats.strikes || 0;
+      }
+      nightBadges(ledger, G.stats, G.profile);
+      const season = session.season || G.season;
+      if (season && season.daily && season.over === 'done') {
+        const today = new Date(now()).toISOString().slice(0, 10);
+        const score = ledger.saved * 100 + ledger.coins + ledger.integ;
+        G.profile.daily = { date: today, score, done: true, best: Math.max(G.profile.daily.date === today ? G.profile.daily.best : 0, score) };
+      } else if (season && season.over) {
+        const score = scoreOf(season);
+        const unlocked = bankSeason(G.profile, season, score);
+        for (const id of unlocked) hud.toast(`Unlocked ${id.replace('-', ' ')}`, 'good');
+        seasonBadges(season);
+        submitScores(G.profile, season, score);
+      }
+      saveProfile(true);
     }
-    nightBadges(ledger, G.stats, G.profile);
-    const season = session.season || G.season;
-    if (season && season.daily && season.over === 'done') {
-      const today = new Date().toISOString().slice(0, 10);
-      const score = ledger.saved * 100 + ledger.coins + ledger.integ;
-      G.profile.daily = { date: today, score, done: true, best: Math.max(G.profile.daily.date === today ? G.profile.daily.best : 0, score) };
-    } else if (season && season.over) {
-      const score = scoreOf(season);
-      const unlocked = bankSeason(G.profile, season, score);
-      for (const id of unlocked) hud.toast(`Unlocked ${id.replace('-', ' ')}`, 'good');
-      seasonBadges(season);
-      submitScores(G.profile, season, score);
-    }
-    saveProfile(true);
     screens.tab = 'ledger';
     G.phase = 'over';
     input.locked = true;
@@ -269,11 +274,18 @@ async function boot() {
     screens.nightOver(ledger, session.isHost, () => session.morning());
   }
 
+  /** The host moved: redraw the screen that has host-only buttons (Start-of-night, Morning, the shop). */
+  function onRole() {
+    if (G.phase === 'day') showDay();
+    else if (G.phase === 'over' && G.ledger) screens.nightOver(G.ledger, session.isHost, () => session.morning());
+    else if (G.phase === 'dusk' && session.state) screens.dusk(session.state, session.isHost);
+  }
+
   function rejoin() {
     screens.clearScreen();
     G.phase = 'boot';
     session.join().then(() => {
-      if (room.match.phase !== 'lobby' && session.state) enterNight(session.state);
+      if (session.room.match.phase !== 'lobby' && session.state) enterNight(session.state);
       else showTitle();
     }).catch((e) => console.error(e));
   }
@@ -334,7 +346,7 @@ async function boot() {
       if (!document.hidden) view.updateTitle(dt, null);
       hud.clear();
       audio.idle(dt);
-      if (session.awaitingSnapshot && screens.name !== 'waiting' && room.match.phase !== 'lobby') screens.waiting('Joining the night');
+      if (session.awaitingSnapshot && screens.name !== 'waiting' && session.room.match.phase !== 'lobby') screens.waiting('Joining the night');
       return;
     }
     if (G.phase === 'dusk' && state.phase === 'night') {
@@ -480,8 +492,8 @@ async function boot() {
   }
 
   // ---- Go.
-  if (room.match.phase !== 'lobby' && session.state) enterNight(session.state);
-  else if (room.match.phase !== 'lobby') screens.waiting('Joining the night');
+  if (session.room.match.phase !== 'lobby' && session.state) enterNight(session.state);
+  else if (session.room.match.phase !== 'lobby') screens.waiting('Joining the night');
   else showTitle();
   if (test) autopilot();
   requestAnimationFrame(frame);

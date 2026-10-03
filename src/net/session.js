@@ -5,7 +5,7 @@
 import { ow, saves, now, onPlatform } from '../platform.js';
 import { createNight, stepNight, addCrew, removeCrew, hydrate, STATIONS, TICK } from '../sim/night.js';
 import { applyCommand } from '../sim/verbs.js';
-import { nightConfig, endNight } from '../sim/season.js';
+import { nightConfig, endNight, cleanSeason, cleanLedger } from '../sim/season.js';
 import { computeMods } from '../sim/modifiers.js';
 import { WEATHER } from '../sim/data/weather.js';
 
@@ -15,8 +15,28 @@ const MAX_STEPS_PER_FRAME = 12;
 const STRIP = new Set(['route', 'tl', 'fx', 'log', 'mods', 'weather']);
 
 function pack(state) {
-  // Floats to two decimals, static parts left out: ~3-6 KB a snapshot.
-  return JSON.stringify(state, (k, v) => (STRIP.has(k) ? undefined : typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v));
+  // Floats to two decimals; static parts, ships already home or lost and things already gone left out: 2-9 KB.
+  return JSON.stringify(state, (k, v) => {
+    if (STRIP.has(k)) return undefined;
+    if (k === 'ships' && Array.isArray(v)) return v.filter((s) => s.st !== 'saved' && s.st !== 'lost');
+    if (k === 'hostiles' && Array.isArray(v)) return v.filter((h) => h.st !== 'gone');
+    return typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;
+  });
+}
+
+// Effects that only the host can decide (a radio roll): a page plays these from the host's snapshot, never from
+// its own prediction. Everything else a page did itself it has already heard, so the echo is skipped.
+const HOST_DECIDES = new Set(['radio-ok', 'radio-fail', 'radio-dead', 'engine']);
+const FX_TEXT = ['k', 'name', 'type', 'id', 'lens', 'mode', 'what', 'order', 'result', 'why', 'st', 'to', 'from', 'by'];
+const FX_NUM = ['coins', 'n', 'x', 'z', 'tx', 'tz', 'level', 'phase', 'near', 'at', 'on', 'lensInt'];
+
+/** An effect from another page, reduced to known fields of the right types (it only feeds sound, toasts and kicks). */
+export function cleanFx(fx) {
+  if (!fx || typeof fx !== 'object' || typeof fx.k !== 'string') return null;
+  const out = {};
+  for (const k of FX_TEXT) if (typeof fx[k] === 'string') out[k] = fx[k].slice(0, 40);
+  for (const k of FX_NUM) if (Number.isFinite(fx[k])) out[k] = Math.max(-1e5, Math.min(1e5, fx[k]));
+  return out;
 }
 
 const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
@@ -24,10 +44,13 @@ const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)
 /** A snapshot from another page: checked for shape and bounds before it becomes the night. */
 function unpack(json, record, previous) {
   let s;
-  try {
-    s = JSON.parse(json);
-  } catch {
-    return null;
+  if (json && typeof json === 'object') s = json;
+  else {
+    try {
+      s = JSON.parse(json);
+    } catch {
+      return null;
+    }
   }
   if (!s || typeof s !== 'object' || s.v !== 1 || !Array.isArray(s.ships) || !Array.isArray(s.hostiles) || !s.beam || !s.res || !s.crew) return null;
   if (s.ships.length > 40 || s.hostiles.length > 24 || (s.pools?.length || 0) > 12 || (s.crates?.length || 0) > 30) return null;
@@ -156,8 +179,7 @@ export class Session {
   }
 
   validSeason(s) {
-    if (!s || typeof s !== 'object' || s.v !== 1 || !Number.isFinite(s.night)) return null;
-    return s;
+    return cleanSeason(s);
   }
 
   validRecord(r) {
@@ -174,10 +196,15 @@ export class Session {
     this.h.onSeason?.(season);
   }
 
+  /** A season belongs to the keeper who began it: a friend's tower never overwrites the run in your own save. */
+  mine(season) {
+    return Boolean(season) && (!season.owner || !this.me || season.owner === this.me.id);
+  }
+
   flushSeason() {
     if (!this.seasonDirty || !this.season) return;
     this.seasonDirty = 0;
-    saves.set('season', this.season);
+    if (this.mine(this.season) && !this.season.daily) saves.set('season', this.season);
   }
 
   onState(key, value) {
@@ -192,8 +219,15 @@ export class Session {
       const r = this.validRecord(value);
       if (r) this.record = r;
     } else if (key === 'ledger') {
-      if (value && typeof value === 'object' && !this.isHost) this.h.onLedger?.(value);
+      const ledger = cleanLedger(value);
+      if (ledger && !this.isHost) this.h.onLedger?.(ledger);
     }
+  }
+
+  /** The ledger in room state when it closes this match's night (the night is over, only the morning is left). */
+  finishedLedger() {
+    const ledger = cleanLedger(this.room?.state?.ledger);
+    return ledger && ledger.mid && this.room.match && ledger.mid === this.room.match.id ? ledger : null;
   }
 
   // ---- The match: a night.
@@ -204,6 +238,16 @@ export class Session {
     this.fxBuffer.length = 0;
     this.record = this.validRecord(room.state.night);
     const mine = this.record && this.record.mid === match.id;
+    const done = late ? this.finishedLedger() : null;
+    if (done) {
+      // The night is already in the ledger: a reload here must not play it (or pay it) a second time.
+      this.role = this.isHost ? 'host' : room.spectating ? 'watch' : 'client';
+      this.state = null;
+      this.awaitingSnapshot = false;
+      this.nightOverHandled = true;
+      this.h.onLedger?.(done);
+      return;
+    }
     if (this.isHost) {
       if (mine && this.state && this.state.mid === match.id) {
         // Still the host of a night this page already runs.
@@ -277,6 +321,7 @@ export class Session {
 
   onHostChange() {
     const room = this.room;
+    if (this.finishedLedger()) this.nightOverHandled = true;
     if (this.isHost && room.match.phase !== 'lobby') {
       // A watcher must not run a night it is not in: hand it to someone who is.
       if (room.spectating) {
@@ -306,6 +351,7 @@ export class Session {
     } else if (room.match.phase !== 'lobby') {
       this.role = room.spectating ? 'watch' : 'client';
     }
+    this.h.onRole?.(this.isHost);
   }
 
   onMatchEnd() {
@@ -324,10 +370,18 @@ export class Session {
       if (!this.isHost || !this.state || !from) return;
       if (!data.c || typeof data.c !== 'object') return;
       if (data.c.k === 'light' && from.id !== this.room.host) return;
+      this.state.fx.length = 0;
       applyCommand(this.state, data.c, from.id);
+      for (const fx of this.state.fx) {
+        fx.by = from.id;
+        this.fxBuffer.push(fx);
+        this.h.onFx?.(fx, this.state);
+      }
+      this.state.fx.length = 0;
+      if (this.fxBuffer.length > 120) this.fxBuffer.splice(0, this.fxBuffer.length - 120);
     } else if (data.t === 'snap') {
       if (this.isHost || !from || from.id !== this.room.host) return; // only the host's snapshots count
-      if (typeof data.s !== 'string' || data.s.length > 60000) return;
+      if (!data.s || (typeof data.s !== 'string' && typeof data.s !== 'object') || (typeof data.s === 'string' && data.s.length > 60000)) return;
       const record = this.record && this.record.mid === this.room.match.id ? this.record : this.validRecord(this.room.state.night);
       if (!record || record.mid !== this.room.match.id) return;
       this.record = record;
@@ -345,14 +399,19 @@ export class Session {
       this.state = s;
       this.awaitingSnapshot = false;
       this.lastSnapAt = now();
-      if (Array.isArray(data.fx)) for (const fx of data.fx.slice(0, 60)) if (fx && typeof fx === 'object' && typeof fx.k === 'string') this.h.onFx?.(fx, this.state);
+      if (Array.isArray(data.fx)) for (const raw of data.fx.slice(0, 60)) {
+        const fx = cleanFx(raw);
+        if (!fx || (fx.by === this.me.id && !HOST_DECIDES.has(fx.k))) continue;
+        this.safe(() => this.h.onFx?.(fx, this.state));
+      }
       this.h.onNight?.(this.state, this.role);
     }
   }
 
   sendSnapshot(to = null) {
     if (!this.isHost || !this.state) return;
-    const msg = { t: 'snap', mid: this.state.mid, s: pack(this.state), fx: to ? [] : this.fxBuffer.splice(0, 60) };
+    // Sent as an object, not a string inside the message: no escaped quotes, a third smaller on the wire.
+    const msg = { t: 'snap', mid: this.state.mid, s: JSON.parse(pack(this.state)), fx: to ? [] : this.fxBuffer.splice(0, 60) };
     this.safe(() => (to ? this.room.send(msg, { to }) : this.room.send(msg)));
     if (!to) this.fxBuffer.length = 0;
   }
@@ -369,8 +428,9 @@ export class Session {
       this.state.fx.length = 0;
       return ok;
     }
+    this.state.fx.length = 0;
     const ok = applyCommand(this.state, cmd, this.me.id);
-    if (ok) for (const fx of this.state.fx) this.h.onFx?.(fx, this.state);
+    for (const fx of this.state.fx) if (!HOST_DECIDES.has(fx.k)) this.h.onFx?.(fx, this.state);
     this.state.fx.length = 0;
     if (cmd.k === 'beam') this.localBeamUntil = now() + 400;
     if (cmd.on === true) {
@@ -445,7 +505,9 @@ export class Session {
   /** The host closes the night: the ledger goes to room state, then the night-over screen. */
   closeNight() {
     if (!this.isHost || !this.state || !this.season) return;
+    if (this.finishedLedger()) return; // a host before me already closed this night
     const ledger = endNight(this.season, this.state);
+    ledger.mid = this.state.mid;
     this.setSeason(this.season);
     this.safe(() => this.room.setState('ledger', ledger));
     this.h.onLedger?.(ledger);
@@ -466,4 +528,4 @@ export class Session {
   }
 }
 
-export { onPlatform, pack, unpack };
+export { onPlatform, pack, unpack, cleanLedger };

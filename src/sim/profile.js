@@ -11,6 +11,7 @@ export function defaultProfile() {
     v: PROFILE_V, best: { score: 0, nights: 0, saved: 0 }, nights: 0, nightsTotal: 0, shipsSaved: 0, seasons: 0, titans: 0, ascCleared: 0,
     endlessBest: 0, almanac: {}, relicsSeen: [], keeper: 'ismay', site: 'skerry-rock', asc: 0, cosmetics: { housing: 'brass', hat: 'none', collar: 'red' },
     pets: 0, hints: {}, daily: { date: '', score: 0, done: false, best: 0 }, tutorial: false, sirens: 0, mimics: 0, strikes: 0,
+    credited: '',
   };
 }
 
@@ -43,6 +44,7 @@ export function loadProfile(raw) {
   if (raw.hints && typeof raw.hints === 'object') for (const k of Object.keys(raw.hints).slice(0, 40)) p.hints[k] = num(raw.hints[k]);
   if (raw.daily && typeof raw.daily === 'object') p.daily = { date: typeof raw.daily.date === 'string' ? raw.daily.date.slice(0, 10) : '', score: num(raw.daily.score), done: Boolean(raw.daily.done), best: num(raw.daily.best) };
   p.tutorial = Boolean(raw.tutorial);
+  if (typeof raw.credited === 'string') p.credited = raw.credited.slice(0, 80);
   if (!unlockedKeepers(p).includes(p.keeper)) p.keeper = 'ismay';
   if (!unlockedSites(p).includes(p.site)) p.site = 'skerry-rock';
   if (p.asc > p.ascCleared) p.asc = p.ascCleared;

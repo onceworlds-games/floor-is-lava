@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newSeason, forecast, nightConfig, endNight, buy, pickRelic, pickCharter, readAlmanac, scoreOf, goEndless, dailyFor, LAST_NIGHT } from '../src/sim/season.js';
+import { newSeason, forecast, nightConfig, endNight, buy, pickRelic, pickCharter, readAlmanac, scoreOf, goEndless, dailyFor, LAST_NIGHT, cleanSeason, cleanLedger } from '../src/sim/season.js';
 import { createNight, stepNight, addCrew } from '../src/sim/night.js';
 import { applyCommand } from '../src/sim/verbs.js';
 import { makeBot, stepBot } from '../src/sim/bots.js';
@@ -134,4 +134,40 @@ test('the forecast and the daily watch are deterministic', () => {
   const ledger = endNight(season, st);
   assert.equal(season.over, 'done');
   assert.ok(ledger.coins >= 0);
+});
+
+test('seasons and ledgers from room state or a save are repaired, never trusted', () => {
+  const good = newSeason({ seed: 5, owner: 'p1' });
+  good.coins = 120;
+  good.relics = ['kettle'];
+  good.upgrades = { lens: 2 };
+  const back = cleanSeason(JSON.parse(JSON.stringify(good)));
+  for (const k of ['night', 'coins', 'seed', 'keeper', 'site', 'owner']) assert.equal(back[k], good[k], k);
+  assert.deepEqual(back.relics, ['kettle']);
+  assert.deepEqual(back.upgrades, { lens: 2 });
+  assert.deepEqual(back.charterOffer, good.charterOffer);
+  // An old save (no owner) still loads; junk is dropped or clamped.
+  const old = JSON.parse(JSON.stringify(good));
+  delete old.owner;
+  assert.equal(cleanSeason(old).owner, null);
+  const junk = cleanSeason({ v: 1, night: 3, coins: 'lots', rep: Infinity, relicOffer: 'x', relics: ['kettle', 7, 'no-such'], upgrades: { lens: 99, bogus: 2 }, log: 'nope', totals: null, keeper: 'nobody', charter: 'free-money', over: 'maybe' });
+  assert.equal(junk.coins, 0);
+  assert.equal(junk.rep, 60);
+  assert.deepEqual(junk.relicOffer, []);
+  assert.deepEqual(junk.relics, ['kettle']);
+  assert.deepEqual(junk.upgrades, { lens: 3 });
+  assert.deepEqual(junk.log, []);
+  assert.equal(junk.keeper, 'ismay');
+  assert.equal(junk.charter, null);
+  assert.equal(junk.over, null);
+  finite(junk);
+  for (const bad of [null, 'season', 42, { v: 2, night: 1 }, { v: 1 }, { v: 1, night: 'x' }]) assert.equal(cleanSeason(bad), null);
+  // A ledger: numbers clamped, strings cut, lists shaped.
+  const l = cleanLedger({ night: 2, saved: 1e9, bonuses: [['Clean night', 40], 'x', [7, 7]], entry: 'y'.repeat(1000), lines: [1, 'a'], result: 'win' });
+  assert.equal(l.saved, 60);
+  assert.deepEqual(l.bonuses, [['Clean night', 40]]);
+  assert.equal(l.entry.length, 300);
+  assert.deepEqual(l.lines, ['a']);
+  assert.equal(l.result, 'dawn');
+  assert.equal(cleanLedger('nope'), null);
 });

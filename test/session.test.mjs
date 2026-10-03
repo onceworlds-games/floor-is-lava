@@ -7,12 +7,14 @@ import { createNight, stepNight, addCrew, TICK } from '../src/sim/night.js';
 import { applyCommand } from '../src/sim/verbs.js';
 import { makeBot, stepBot } from '../src/sim/bots.js';
 import { GOOD, finite } from './helpers.mjs';
+import { saves } from '../src/platform.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function page(server, id, name = id) {
-  const log = { fx: [], toasts: [], ledgers: [], nights: [] };
+  const log = { fx: [], toasts: [], ledgers: [], nights: [], roles: [] };
   const session = new Session({
+    onRole: (isHost) => log.roles.push(isHost),
     onFx: (fx) => log.fx.push(fx.k),
     onToast: (t) => log.toasts.push(t),
     onLedger: (l) => log.ledgers.push(l),
@@ -172,4 +174,95 @@ test('a lone host that reloads mid-night restarts it from dusk; three nights in 
     assert.equal(server.match.phase, 'lobby');
   }
   assert.equal(A.session.season.night, 4);
+});
+
+/** Three pages in a running night, lamp lit. */
+async function threeInANight(seed = 4) {
+  const server = new FakeServer();
+  const A = page(server, 'A');
+  const B = page(server, 'B');
+  const C = page(server, 'C');
+  for (const p of [A, B, C]) await p.join();
+  A.session.setSeason(newSeason({ seed, owner: 'A' }));
+  for (const p of [B, C]) p.session.room.setReady(true);
+  assert.ok(A.session.startNight());
+  await run([A, B, C], 300);
+  A.session.command({ k: 'light' });
+  await run([A, B, C], 300);
+  return { server, A, B, C };
+}
+
+test("a guest's flare is heard by the host and the third keeper, and once by the guest", async () => {
+  const { A, B, C } = await threeInANight();
+  B.session.command({ k: 'station', st: 'gallery' });
+  await run([A, B, C], 2600);
+  assert.equal(A.session.state.crew.B.st, 'gallery');
+  for (const p of [A, B, C]) p.log.fx.length = 0;
+  B.session.command({ k: 'flare', x: 40, z: 90 });
+  await run([A, B, C], 500);
+  const count = (p) => p.log.fx.filter((k) => k === 'flare').length;
+  assert.equal(count(A), 1, 'the host hears it');
+  assert.equal(count(C), 1, 'the third keeper hears it');
+  assert.equal(count(B), 1, 'the guest hears it once, not again in the echo');
+});
+
+test('a lone host who reloads on the ledger gets the ledger back; the night is paid once', async () => {
+  const server = new FakeServer();
+  let A = page(server, 'A');
+  await A.join();
+  A.session.setSeason(newSeason({ seed: 21, owner: 'A' }));
+  assert.ok(A.session.startNight());
+  await run([A], 150);
+  A.session.command({ k: 'light' });
+  await run([A], 200);
+  A.session.state.phase = 'over';
+  A.session.state.result = 'dawn';
+  A.session.state.stats.coins = 77;
+  await run([A], 200);
+  assert.equal(A.log.ledgers.length, 1);
+  const paid = server.state.season.coins;
+  assert.equal(server.state.season.night, 2);
+  // Reload on the ledger screen: the page comes back to the same ledger, not to the same night at dusk.
+  server.drop('A');
+  A = page(server, 'A');
+  await A.join();
+  await run([A], 400);
+  assert.equal(A.log.ledgers.length, 1, 'the ledger is shown again');
+  assert.equal(A.log.ledgers[0].mid, server.match.id);
+  assert.equal(A.session.state, null, 'no night is replayed');
+  assert.ok(!A.log.toasts.includes('The night starts over'));
+  assert.equal(server.state.season.coins, paid, 'and nothing is paid twice');
+  assert.equal(server.state.season.night, 2);
+  A.session.morning();
+  assert.equal(server.match.phase, 'lobby');
+});
+
+test('the host leaves on the ledger: the new host is told, can bring the morning, and the night closes once', async () => {
+  const { server, A, B, C } = await threeInANight(8);
+  A.session.state.phase = 'over';
+  A.session.state.result = 'dawn';
+  await run([A, B, C], 400);
+  assert.equal(B.log.ledgers.length, 1);
+  const night = server.state.season.night;
+  const coins = server.state.season.coins;
+  B.log.roles.length = 0;
+  server.leave('A');
+  await run([B, C], 400);
+  assert.equal(server.host, 'B');
+  assert.deepEqual(B.log.roles, [true], 'the new host redraws its screen with the host buttons');
+  assert.equal(server.state.season.night, night, 'the new host does not close the night again');
+  assert.equal(server.state.season.coins, coins);
+  B.session.morning();
+  assert.equal(server.match.phase, 'lobby');
+});
+
+test("a friend's season never overwrites a guest's own saved run", async () => {
+  const { A, B } = await threeInANight(12);
+  await saves.set('season', { mine: 'B' });
+  B.session.seasonDirty = 1;
+  B.session.flushSeason();
+  assert.deepEqual(await saves.get('season'), { mine: 'B' }, "the guest's own run is untouched");
+  A.session.seasonDirty = 1;
+  A.session.flushSeason();
+  assert.equal((await saves.get('season')).owner, 'A', 'the host keeps its own run');
 });

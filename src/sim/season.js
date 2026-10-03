@@ -8,15 +8,15 @@ import { WEATHER, weatherWeights } from './data/weather.js';
 import { KEEPERS } from './data/keepers.js';
 import { SITES } from './data/sites.js';
 import { HOSTILE_ORDER } from './data/hostiles.js';
-import { DAILY_MUTATORS } from './data/daily.js';
+import { DAILY_MUTATORS, MUTATOR_BY_ID } from './data/daily.js';
 
 export const SEASON_V = 1;
 export const LAST_NIGHT = 12;
 
 
-export function newSeason({ keeper = 'ismay', site = 'skerry-rock', asc = 0, seed = 1, daily = null } = {}) {
+export function newSeason({ keeper = 'ismay', site = 'skerry-rock', asc = 0, seed = 1, daily = null, owner = null } = {}) {
   const season = {
-    v: SEASON_V, id: `${seed}`, seed: Number(seed) >>> 0 || 1, keeper: KEEPERS[keeper] ? keeper : 'ismay', site: SITES[site] ? site : 'skerry-rock',
+    v: SEASON_V, id: `${seed}`, owner: typeof owner === 'string' ? owner.slice(0, 64) : null, seed: Number(seed) >>> 0 || 1, keeper: KEEPERS[keeper] ? keeper : 'ismay', site: SITES[site] ? site : 'skerry-rock',
     asc: Math.max(0, Math.min(6, Number(asc) || 0)), night: 1, coins: 0, rep: 60, upgrades: {}, relics: [], charter: null,
     relicOffer: [], charterOffer: [], almanacRead: [], ledger: null, totals: { saved: 0, wrecked: 0, coins: 0, nights: 0, crates: 0 },
     over: null, endless: false, daily: daily || null, forecastAt: 0, log: [],
@@ -29,6 +29,58 @@ export function newSeason({ keeper = 'ismay', site = 'skerry-rock', asc = 0, see
     season.mutators = (daily.mutators || []).slice(0, 3);
   }
   season.charterOffer = offerCharters(season);
+  return season;
+}
+
+const clampNum = (x, lo, hi, d) => (Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d);
+const texts = (a, max, len = 40) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string').slice(0, max).map((x) => x.slice(0, len)) : []);
+
+/** A night's ledger from anywhere (room state, a save): shape and numbers checked, so a bad one can't break a page or a profile. */
+export function cleanLedger(v) {
+  if (!v || typeof v !== 'object') return null;
+  const n = (x, lo, hi) => Math.round(clampNum(x, lo, hi, 0));
+  const text = (x, len) => (typeof x === 'string' ? x.slice(0, len) : '');
+  return {
+    mid: text(v.mid, 80), night: Math.max(1, n(v.night, 1, 999)), result: ['dawn', 'disaster', 'dismissed'].includes(v.result) ? v.result : 'dawn',
+    saved: n(v.saved, 0, 60), wrecked: n(v.wrecked, 0, 60), shipsIn: n(v.shipsIn, 0, 60), coins: n(v.coins, 0, 1e5), earned: n(v.earned, 0, 1e5),
+    rep: n(v.rep, -1, 100), repDelta: n(v.repDelta, -200, 200), oilLeft: n(v.oilLeft, 0, 100), integ: n(v.integ, 0, 100), cracks: n(v.cracks, 0, 99),
+    titan: Boolean(v.titan), entry: text(v.entry, 300),
+    bonuses: Array.isArray(v.bonuses) ? v.bonuses.slice(0, 8).filter((b) => Array.isArray(b) && typeof b[0] === 'string').map((b) => [b[0].slice(0, 30), n(b[1], 0, 1e4)]) : [],
+    survived: texts(v.survived, 12).filter((t) => HOSTILE_ORDER.includes(t)),
+    lines: texts(v.lines, 8, 120),
+  };
+}
+
+/**
+ * A season from room state or a save, repaired into the shape the screens and the night expect (null when it
+ * is not a season at all). Old saves gain the new fields; unknown ids, junk numbers and oversized lists are dropped.
+ */
+export function cleanSeason(raw, depth = 0) {
+  if (!raw || typeof raw !== 'object' || Number(raw.v) !== SEASON_V || !Number.isFinite(raw.night)) return null;
+  const t = raw.totals && typeof raw.totals === 'object' ? raw.totals : {};
+  const up = raw.upgrades && typeof raw.upgrades === 'object' ? raw.upgrades : {};
+  const season = {
+    v: SEASON_V, id: typeof raw.id === 'string' ? raw.id.slice(0, 40) : String(raw.seed ?? 1), owner: typeof raw.owner === 'string' ? raw.owner.slice(0, 64) : null,
+    seed: Number(raw.seed) >>> 0 || 1, keeper: KEEPERS[raw.keeper] ? raw.keeper : 'ismay', site: SITES[raw.site] ? raw.site : 'skerry-rock',
+    asc: Math.round(clampNum(raw.asc, 0, 6, 0)), night: Math.round(clampNum(raw.night, 1, 999, 1)), coins: Math.round(clampNum(raw.coins, 0, 1e6, 0)),
+    rep: clampNum(raw.rep, -1, 100, 60), upgrades: {}, relics: texts(raw.relics, 12).filter((id) => RELIC_BY_ID[id]),
+    charter: CHARTER_BY_ID[raw.charter] ? raw.charter : null, relicOffer: texts(raw.relicOffer, 3).filter((id) => RELIC_BY_ID[id]),
+    charterOffer: texts(raw.charterOffer, 3).filter((id) => CHARTER_BY_ID[id]), almanacRead: texts(raw.almanacRead, 2).filter((x) => HOSTILE_ORDER.includes(x)),
+    ledger: cleanLedger(raw.ledger),
+    totals: { saved: Math.round(clampNum(t.saved, 0, 1e5, 0)), wrecked: Math.round(clampNum(t.wrecked, 0, 1e5, 0)), coins: Math.round(clampNum(t.coins, 0, 1e7, 0)), nights: Math.round(clampNum(t.nights, 0, 999, 0)), crates: Math.round(clampNum(t.crates, 0, 1e5, 0)) },
+    over: ['won', 'lost', 'done'].includes(raw.over) ? raw.over : null, endless: Boolean(raw.endless), daily: null,
+    forecastAt: 0, log: texts(raw.log, 40, 300),
+  };
+  for (const item of SHOP) {
+    const k = Math.floor(clampNum(Number(up[item.id]), 0, 3, 0));
+    if (k > 0) season.upgrades[item.id] = k;
+  }
+  if (Array.isArray(raw.mutators)) season.mutators = texts(raw.mutators, 3).filter((id) => MUTATOR_BY_ID[id]);
+  if (raw.daily && typeof raw.daily === 'object') {
+    const d = raw.daily;
+    season.daily = { date: typeof d.date === 'string' ? d.date.slice(0, 10) : '', seed: Number(d.seed) >>> 0 || 1, keeper: season.keeper, site: season.site, night: season.night, mutators: season.mutators || [], relics: season.relics.slice(0, 4), upgrades: { ...season.upgrades } };
+    if (depth === 0 && raw.stash) season.stash = cleanSeason(raw.stash, 1);
+  }
   return season;
 }
 
