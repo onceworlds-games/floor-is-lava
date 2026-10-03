@@ -1,0 +1,8 @@
+{
+  "slug": "watchlight",
+  "name": "Watchlight",
+  "description": "Keep the lighthouse burning through the storm. Guide ships home and drive back what rises from the sea.",
+  "dir": "dist",
+  "productionBranch": "main",
+  "genre": "Survival"
+}
