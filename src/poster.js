@@ -106,17 +106,15 @@ export async function runPoster(kind) {
     const dist = Math.hypot(p.x, p.z);
     const u = { x: p.x / dist, z: p.z / dist };
     const side = { x: u.z, z: -u.x };
+    const cam = new THREE.Vector3(p.x + u.x * 46 - side.x * 30, 9, p.z + u.z * 46 - side.z * 30);
+    // She sits between us and the light, just outside the pool: a figure cut out against the lit water.
     const siren = spawnHostile(st, { type: 'siren', u: 0.5, side: 1, tell: 0 });
     siren.st = 'sing';
-    siren.x = p.x + u.x * 17 - side.x * 13;
-    siren.z = p.z + u.z * 17 - side.z * 13;
+    siren.x = cam.x + (p.x - cam.x) * 0.52 - side.x * 7;
+    siren.z = cam.z + (p.z - cam.z) * 0.52 - side.z * 7;
     spot(st, p.x, p.z, 18, 'amber');
     stand(st, 'lantern');
-    camera = {
-      pos: new THREE.Vector3(p.x + u.x * 46 - side.x * 30, 11, p.z + u.z * 46 - side.z * 30),
-      target: new THREE.Vector3(p.x * 0.45 - side.x * 4, 15, p.z * 0.45 - side.z * 4),
-      fov: 50,
-    };
+    camera = { pos: cam, target: new THREE.Vector3(p.x * 0.45 - side.x * 4, 13, p.z * 0.45 - side.z * 4), fov: 50 };
     strike = { x: -u.x * 150 + side.x * 120, z: -u.z * 150 + side.z * 120 };
     strikeAt = 47;
     keep = () => {

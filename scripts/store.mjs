@@ -1,5 +1,5 @@
-// Renders the store art with the game's own scenes (?poster=...) in headless Chrome and saves it
-// into store/.   npm run build && npm run store [only]
+// Renders the store art with the game's own scenes (?poster=...) in headless Chrome on the graphics card, at the
+// high tier, and saves it into store/.   npm run build && npm run store [only]
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { serve, launch, sleep } from './cdp.mjs';
 
@@ -16,12 +16,12 @@ const SHOTS = [
 const only = process.argv[2];
 mkdirSync('store/badges', { recursive: true });
 const { server, port } = await serve('dist');
-const b = await launch({ width: 1280, height: 720 });
+const b = await launch({ width: 1280, height: 720, gpu: true });
 for (const [kind, w, h, out] of SHOTS) {
   if (only && !kind.includes(only) && !out.includes(only)) continue;
   await b.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
   await b.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: kind.startsWith('badge') ? 0 : 1 } });
-  await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?poster=${kind}` });
+  await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?poster=${kind}&quality=high` });
   let ok = false;
   for (let i = 0; i < 300 && !ok; i++) {
     await sleep(100);

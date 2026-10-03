@@ -1,17 +1,19 @@
 // Standalone smoke test: the built game runs its autopilot (?test) in headless Chrome for a while,
 // with no SDK. Fails on any uncaught error.   npm run build && npm run smoke [seconds]
 import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { serve, launch, sleep } from './cdp.mjs';
 
 const seconds = Number(process.argv[2] || 60);
 const { server, port } = await serve('dist');
-const b = await launch({ width: 900, height: 600 });
+const b = await launch({ width: 900, height: 600, gpu: true });
 const errors = [];
 b.on((m) => {
   if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
   if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errors.push(`error: ${m.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 300)}`);
 });
-await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?test&speed=8` });
+await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?test&speed=8&quality=high` });
 const t0 = Date.now();
 let lastPhase = '';
 while (Date.now() - t0 < seconds * 1000) {
@@ -23,7 +25,7 @@ while (Date.now() - t0 < seconds * 1000) {
   }
 }
 const r = await b.send('Page.captureScreenshot', { format: 'png' });
-writeFileSync('smoke.png', Buffer.from(r.result.data, 'base64'));
+writeFileSync(join(tmpdir(), 'watchlight-smoke.png'), Buffer.from(r.result.data, 'base64'));
 console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'no errors');
 b.close();
 server.close();

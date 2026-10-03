@@ -29,8 +29,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TESTING = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
 const CHROME = process.env.CHROME ?? (existsSync(TESTING) ? TESTING : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 
+// gpu: draw with the machine's graphics card (Metal on a Mac) instead of the software renderer, which forces the
+// game's lowest tier and flattens the picture. SOFTWARE_GL=1 forces the software renderer (a machine with no GPU).
 export async function launch({ width = 1280, height = 720, gpu = false } = {}) {
   const profile = mkdtempSync(join(process.env.TMP_PROFILES ?? tmpdir(), 'hb-chrome-'));
+  const hardware = gpu && !process.env.SOFTWARE_GL;
   const args = [
     '--headless=new',
     '--hide-scrollbars',
@@ -39,15 +42,13 @@ export async function launch({ width = 1280, height = 720, gpu = false } = {}) {
     '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`,
     `--window-size=${width},${height}`,
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
+    ...(hardware ? [process.platform === 'darwin' ? '--use-angle=metal' : '--use-angle=default', '--enable-gpu'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox']),
     '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
     'about:blank',
   ];
-  if (!gpu) args.unshift('--disable-gpu-sandbox');
   const chrome = spawn(CHROME, args, { stdio: 'ignore' });
   // Never leave a browser behind, even when a test crashes.
   process.on('exit', () => {
