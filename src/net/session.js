@@ -53,9 +53,13 @@ function unpack(json, record, previous) {
     }
   }
   if (!s || typeof s !== 'object' || s.v !== 1 || !Array.isArray(s.ships) || !Array.isArray(s.hostiles) || !s.beam || !s.res || !s.crew) return null;
-  if (s.ships.length > 40 || s.hostiles.length > 24 || (s.pools?.length || 0) > 12 || (s.crates?.length || 0) > 30) return null;
+  if (s.ships.length > 40 || s.hostiles.length > 24 || (s.pools?.length || 0) > 12 || (s.crates?.length || 0) > 30 || (s.shots?.length || 0) > 12) return null;
+  for (const k of ['pools', 'crates', 'shots']) if (s[k] !== undefined && !Array.isArray(s[k])) return null;
+  for (const list of [s.ships, s.hostiles, s.pools || [], s.crates || [], s.shots || []]) if (list.some((x) => !x || typeof x !== 'object')) return null;
   s.mods = previous?.mods || record.mods;
-  s.weather = previous?.weather || record.weather;
+  // The record names the weather by id; the night needs the weather itself (storm, rain, fog), or every guest's
+  // sea, fog and drift turn to NaN.
+  s.weather = previous?.weather && typeof previous.weather === 'object' ? previous.weather : WEATHER[record.weather] || WEATHER.clear;
   s.route = previous?.route || null;
   s.tl = null;
   s.log = previous?.log || [];
@@ -83,6 +87,24 @@ function unpack(json, record, previous) {
     sh.s = num(sh.s, 0, 2000, 0);
     sh.d = num(sh.d, -200, 200, 0);
     sh.name = String(sh.name || '').slice(0, 24);
+  }
+  for (const p of s.pools) {
+    p.x = num(p.x, -500, 500, 0);
+    p.z = num(p.z, -500, 500, 0);
+    p.r = num(p.r, 1, 80, 28);
+    p.I = num(p.I, 0, 4, 0.8);
+    p.life = num(p.life, 0, 60, 0);
+  }
+  for (const c of s.crates) {
+    c.x = num(c.x, -500, 500, 0);
+    c.z = num(c.z, -500, 500, 0);
+    c.lit = num(c.lit, 0, 10, 0);
+    c.life = num(c.life, 0, 1e4, 0);
+  }
+  for (const sh of s.shots) {
+    sh.x = num(sh.x, -500, 500, 0);
+    sh.z = num(sh.z, -500, 500, 0);
+    sh.life = num(sh.life, 0, 2, 0);
   }
   for (const h of s.hostiles) {
     h.x = num(h.x, -500, 500, 0);

@@ -53,6 +53,11 @@ test('pack and unpack round-trip a night and refuse junk', () => {
   const record = { mid: 'm1', seed: 5, night: 4, weather: 'rain', mods: st.mods, site: 'skerry-rock', base: 0 };
   const copy = unpack(json, record, null);
   assert.ok(copy && copy.ships.length === st.ships.length && copy.route.L === st.route.L);
+  assert.equal(typeof copy.weather, 'object', 'a guest gets the weather itself, not its name');
+  assert.equal(copy.weather.storm, st.weather.storm);
+  // A guest steps its copy between snapshots: nothing turns to NaN.
+  for (let i = 0; i < 200; i++) stepNight(copy, TICK);
+  finite({ ...copy, route: null, tl: null });
   finite({ ...copy, route: null, tl: null });
   for (const bad of ['', 'nope', '{"v":2}', JSON.stringify({ v: 1, ships: 'x', hostiles: [], beam: {}, res: {}, crew: {} }), JSON.stringify({ ...JSON.parse(json), ships: new Array(41).fill({}) })]) assert.equal(unpack(bad, record, null), null);
   const nan = JSON.parse(json);

@@ -455,7 +455,7 @@ export class Screens {
     const s = el('div', 'screen');
     s.style.justifyContent = 'flex-end';
     // Above the thumbs when the touch controls are up.
-    s.style.paddingBottom = controls.touch ? 'calc(27% + var(--sab))' : 'calc(14% + var(--sab))';
+    s.style.paddingBottom = controls.touch ? (window.innerHeight > window.innerWidth ? 'calc(36vh + var(--sab))' : 'calc(22vh + var(--sab))') : 'calc(14vh + var(--sab))';
     s.style.pointerEvents = 'none';
     const box = el('div');
     box.style.pointerEvents = 'auto';
