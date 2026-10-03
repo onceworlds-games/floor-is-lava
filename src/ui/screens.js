@@ -526,7 +526,7 @@ export class Screens {
         const pos = shipPos(state.route, s.s, s.d);
         const b = button('', s === chosen ? 'on' : '', () => (this.click(), chosen = s, renderList(), renderOrders()));
         b.append(el('span', '', s.name));
-        b.append(el('span', '', `${s.st === 'distress' ? 'engine out' : s.hidden ? 'in fog' : `${s.d > 0 ? 'starboard' : 'port'} of the line`} · ${Math.round(Math.hypot(pos.x, pos.z))} m`));
+        b.append(el('span', '', `${s.st === 'distress' ? `engine out · ${Math.max(0, Math.ceil(s.distressLeft || 0))} s${s.guided > 0 ? ' · lit' : ' · light it'}` : s.hidden ? 'in fog' : `${s.d > 0 ? 'starboard' : 'port'} of the line`} · ${Math.round(Math.hypot(pos.x, pos.z))} m`));
         list.append(b);
       }
     };

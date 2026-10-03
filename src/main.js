@@ -13,6 +13,7 @@ import { newSeason, creditNight, buy, pickRelic, skipRelic, pickCharter, readAlm
 import { makeBot, stepBot } from './sim/bots.js';
 import { STATIONS, TICK } from './sim/night.js';
 import { maxDist } from './sim/beam.js';
+import { TITAN } from './sim/hostiles.js';
 import { award, nightBadges, seasonBadges, submitScores } from './badges.js';
 
 const q = new URLSearchParams(location.search);
@@ -295,7 +296,12 @@ async function boot() {
     audio.fx(fx, state);
     switch (fx.k) {
       case 'saved': hud.toast(`${fx.name} home +${fx.coins}`, 'good'); break;
-      case 'wreck': hud.toast(`${fx.name} wrecked`, 'bad'); break;
+      case 'wreck': hud.toast(fx.why === 'foundered' ? `${fx.name} foundered` : `${fx.name} wrecked`, 'bad'); break;
+      case 'guided': hud.pop(fx.id); break;
+      case 'distress': hud.toast(`${fx.name}: engine out`, 'bad'); break;
+      case 'engine': hud.toast('Under way', 'good'); break;
+      case 'titan-blast': hud.toast(`Horn ${Math.min(TITAN.blasts, fx.n || 0)}/${TITAN.blasts}`, 'good'); break;
+      case 'lure-hit': hud.toast('Lure burning', 'good'); break;
       case 'hail': hud.toast(`${fx.name} hailing`); break;
       case 'crack': hud.toast('Lens cracked', 'bad'); break;
       case 'door': hud.toast(`${fx.n} at the door`, 'bad'); break;

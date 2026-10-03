@@ -276,3 +276,55 @@ test('wiping the lens ends the moth swarm; a fog bank that has gone no longer ea
   w.st = 'tell';
   assert.equal(lightAt(st, w.x, w.z).I, clear, 'a bank that has not arrived yet does not dim either');
 });
+
+test('a dead engine restarts once lit and ordered; left alone it founders', async () => {
+  const { DISTRESS_TIME } = await import('../src/sim/ships.js');
+  const st = night({ station: 'watch' });
+  st.mods.radioSure = true;
+  const a = spawnShip(st, { type: 'ferry', name: 'Lit', d: 0 });
+  const b = spawnShip(st, { type: 'smack', name: 'Dark', d: 0 });
+  for (const s of [a, b]) {
+    s.s = 120;
+    s.dStop = 121;
+  }
+  for (let i = 0; i < 40; i++) stepNight(st);
+  assert.equal(a.st, 'distress');
+  assert.equal(b.st, 'distress');
+  // An order before any light does nothing for the engine.
+  assert.ok(applyCommand(st, { k: 'radio', ship: a.id, order: 'port' }, 'p1'));
+  assert.equal(a.st, 'distress');
+  // Guided by the light, then ordered: under way again.
+  a.guided = 3;
+  a.orderLeft = 0;
+  assert.ok(applyCommand(st, { k: 'radio', ship: a.id, order: 'port' }, 'p1'));
+  assert.equal(a.st, 'sail');
+  assert.equal(a.distressLeft, 0);
+  for (let i = 0; i < (DISTRESS_TIME + 2) / TICK; i++) stepNight(st);
+  assert.equal(b.st === 'wreck' || b.st === 'lost', true, 'the one nobody answered went down');
+  assert.notEqual(a.st, 'wreck');
+});
+
+test('the Titan never stalls for want of iron or fire, and its faces need what they say', async () => {
+  const { TITAN, spawnHostile } = await import('../src/sim/hostiles.js');
+  const st = night({ night: 12, season: GOOD, weather: 'rain' });
+  st.res.harpoons = 0;
+  st.res.flares = 0;
+  const t = spawnHostile(st, { type: 'titan' });
+  t.tellLeft = 0.01;
+  stepNight(st);
+  assert.equal(t.st, 'fight');
+  t.lightAcc = TITAN.eyes;
+  stepNight(st);
+  assert.equal(t.phase, 2);
+  assert.ok(st.res.harpoons * st.mods.harpoonDmgMul >= TITAN.hits, 'enough harpoons for the arms');
+  t.hit = TITAN.hits;
+  stepNight(st);
+  assert.equal(t.phase, 3);
+  assert.ok(st.res.flares >= TITAN.lures, 'a flare for each lure');
+  t.blasts = TITAN.blasts;
+  for (const l of t.lures) l.hit = 1;
+  t.flares = TITAN.lures;
+  stepNight(st);
+  assert.equal(t.st, 'gone');
+  assert.ok(st.flags.titanDown);
+});

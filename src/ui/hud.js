@@ -5,6 +5,7 @@ import { settings, controls } from '../platform.js';
 import { shipPos } from '../sim/route.js';
 import { poolCentre } from '../sim/beam.js';
 import { SHIPS } from '../sim/data/ships.js';
+import { TITAN } from '../sim/hostiles.js';
 
 const AMBER = '#f0a63a';
 const TEAL = '#35b6a6';
@@ -22,7 +23,13 @@ export class Hud {
     this.toasts = [];
     this.label = null;
     this.flashStun = 0;
+    this.pops = []; // rings that burst where a ship turns Guided
     this.resize();
+  }
+
+  /** A ship just turned Guided: a ring bursts around it on screen. */
+  pop(id) {
+    if (this.pops.length < 8) this.pops.push({ id, t: 0 });
   }
 
   resize() {
@@ -182,7 +189,7 @@ export class Hud {
         c.stroke();
       }
     }
-    // Labels on things: scanned names, hails, the guided mark.
+    // Labels on things: scanned names, hails, the guided mark, and the ring that fills while a ship is in the light.
     if (view) {
       c.font = `700 ${small ? 11 : 13}px Ledger, sans-serif`;
       c.textAlign = 'center';
@@ -193,9 +200,44 @@ export class Hud {
         if (!p || p.depth > 0.9995) continue;
         const d = Math.hypot(sp.x, sp.z);
         if (d > 320) continue;
-        c.fillStyle = ship.st === 'wreck' ? DANGER : ship.needs ? AMBER : ship.guided > 0 ? TEAL : DIM;
-        const tag = ship.st === 'wreck' ? 'WRECK' : ship.st === 'distress' ? 'ENGINE OUT' : ship.guided > 0 ? 'GUIDED' : ship.needs ? 'DRIFTING' : '';
+        const guided = ship.guided > 0 && ship.st !== 'wreck';
+        c.fillStyle = ship.st === 'wreck' ? DANGER : ship.st === 'distress' ? AMBER : guided ? TEAL : ship.needs ? AMBER : DIM;
+        const tag = ship.st === 'wreck' ? 'WRECK' : ship.st === 'distress' ? `ENGINE OUT ${Math.max(0, Math.ceil(ship.distressLeft || 0))}` : guided ? 'GUIDED' : ship.needs ? 'DRIFTING' : '';
         c.fillText(`${ship.name.toUpperCase()}${tag ? ' · ' + tag : ''}`, p.x, p.y);
+        // The guidance ring: fills while the light holds the ship, closes and glows once it is Guided.
+        const ring = view.project(sp.x, 1.5, sp.z);
+        if (ring && ship.st !== 'wreck' && (ship.credit > 0.05 || guided)) {
+          const rr = small ? 13 : 16;
+          c.lineWidth = 3;
+          c.strokeStyle = 'rgba(53,182,166,0.25)';
+          c.beginPath();
+          c.arc(ring.x, ring.y + rr * 0.8, rr, 0, Math.PI * 2);
+          c.stroke();
+          c.strokeStyle = TEAL;
+          c.beginPath();
+          const k = guided ? Math.min(1, ship.guided / 6) : Math.min(1, ship.credit / 1.5);
+          c.arc(ring.x, ring.y + rr * 0.8, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
+          c.stroke();
+        }
+      }
+      // Rings that burst where a ship just turned Guided.
+      for (let i = this.pops.length - 1; i >= 0; i--) {
+        const pp = this.pops[i];
+        pp.t += dt;
+        const ship = state.ships.find((x) => x.id === pp.id);
+        if (pp.t > 0.6 || !ship) {
+          this.pops.splice(i, 1);
+          continue;
+        }
+        const sp = shipPos(state.route, ship.s, ship.d);
+        const q = view.project(sp.x, 1.5, sp.z);
+        if (!q) continue;
+        const e = 1 - (1 - pp.t / 0.6) ** 3;
+        c.strokeStyle = `rgba(53,182,166,${(1 - pp.t / 0.6).toFixed(3)})`;
+        c.lineWidth = 3;
+        c.beginPath();
+        c.arc(q.x, q.y + 13, 16 + e * 34, 0, Math.PI * 2);
+        c.stroke();
       }
       for (const hst of state.hostiles) {
         if (hst.st === 'gone' || hst.st === 'tell' || hst.type === 'moths' || hst.type === 'wraith') continue;
@@ -206,6 +248,9 @@ export class Hud {
         c.fillText(hst.type === 'mimic' ? 'FALSE LIGHTS' : hst.type === 'drowned' ? `DROWNED ×${hst.n}` : hst.type.toUpperCase(), p.x, p.y);
       }
     }
+    // The Tide Titan: which face, what it wants, how far along, and the face's clock.
+    const titan = state.hostiles.find((x) => x.type === 'titan' && x.st === 'fight');
+    if (titan) this.titanBar(titan, w, small);
     // Scan readout at the gallery.
     if (opts.scanLabel) {
       c.font = `700 ${small ? 14 : 16}px Ledger, sans-serif`;
@@ -266,5 +311,33 @@ export class Hud {
     }
   }
 }
+
+Hud.prototype.titanBar = function titanBar(t, w, small) {
+  const c = this.ctx;
+  const bw = Math.min(small ? 220 : 340, w - 40);
+  const x = (w - bw) / 2;
+  const y = small ? 62 : 66;
+  const face = t.phase === 1 ? 'EYES' : t.phase === 2 ? 'ARMS' : 'MAW';
+  const want = t.phase === 1 ? 'HARD WHITE LIGHT' : t.phase === 2 ? `HARPOONS ${Math.min(TITAN.hits, Math.floor(t.hit))}/${TITAN.hits}` : `HORN ${Math.min(TITAN.blasts, t.blasts)}/${TITAN.blasts} · FLARES ${Math.min(TITAN.lures, t.flares)}/${TITAN.lures}`;
+  const k = t.phase === 1 ? t.lightAcc / TITAN.eyes : t.phase === 2 ? t.hit / TITAN.hits : (Math.min(TITAN.blasts, t.blasts) + Math.min(TITAN.lures, t.flares)) / (TITAN.blasts + TITAN.lures);
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  c.font = `900 ${small ? 13 : 15}px Ledger, sans-serif`;
+  c.fillStyle = DANGER;
+  c.fillText(`THE TIDE TITAN · ${face}`, w / 2, y);
+  c.fillStyle = 'rgba(7,12,21,0.75)';
+  c.fillRect(x, y + 6, bw, 8);
+  c.fillStyle = AMBER;
+  c.fillRect(x, y + 6, bw * Math.max(0, Math.min(1, k)), 8);
+  c.strokeStyle = 'rgba(122,79,22,0.9)';
+  c.lineWidth = 1;
+  c.strokeRect(x + 0.5, y + 6.5, bw - 1, 7);
+  // The face's clock runs down under the bar: when it empties, the Titan slams the tower.
+  c.fillStyle = 'rgba(217,67,47,0.85)';
+  c.fillRect(x, y + 16, bw * Math.max(0, Math.min(1, t.phaseLeft / TITAN.face)), 2);
+  c.font = `700 ${small ? 11 : 12}px Plain, sans-serif`;
+  c.fillStyle = INK;
+  c.fillText(want, w / 2, y + 32);
+};
 
 export { drawChart, SHIPS, poolCentre };

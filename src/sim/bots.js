@@ -8,6 +8,7 @@
 import { applyCommand } from './verbs.js';
 import { shipPosOf } from './night.js';
 import { reefAt } from './route.js';
+import { TITAN } from './hostiles.js';
 
 const SKILL = {
   lazy: { period: 4.5, danger: 0.8, stations: ['lantern'], lens: false, strobe: false, gallery: false, watch: false, preempt: false, heat: false, oil: false, sticky: true },
@@ -116,6 +117,11 @@ function plan(state, bot) {
     return { st: 'gallery', why: 'fog-flare', run: () => send(state, bot, { k: 'flare', x: p.x, z: p.z }) };
   }
   if (moths && s.strobe && b.grit > 0.3) return { st: 'lantern', why: 'moths', run: () => { spot(state, bot); send(state, bot, { k: 'strobe', on: true }); } };
+  // A dead engine that the light has found: the radio restarts it.
+  const stalled = state.ships.find((x) => x.st === 'distress' && x.guided > 0.5 && x.orderLeft <= 0);
+  if (stalled && s.watch && bot.kind !== 'lazy' && res.power >= 6 * state.mods.radioCostMul) {
+    return { st: 'watch', why: 'restart', run: () => send(state, bot, { k: 'radio', ship: stalled.id, order: stalled.d > 0 ? 'port' : 'starboard' }) };
+  }
   // Ships.
   if (ship) {
     const p = shipPosOf(state, ship);
@@ -149,11 +155,13 @@ function titanPlan(state, bot, titan) {
     if (res.harpoons > 0) return { st: 'gallery', why: 'titan-reload', run: () => send(state, bot, { k: 'repair', on: true }) };
     return { st: 'gallery', why: 'titan-repair', run: () => send(state, bot, { k: 'repair', on: true }) };
   }
-  if (titan.flares < 2 && res.flares > 0) {
+  if (titan.flares < TITAN.lures && res.flares > 0) {
     const lure = titan.lures.find((l) => !l.hit) || titan.lures[0];
     if (lure) return { st: 'gallery', why: 'titan-lure', run: () => send(state, bot, { k: 'flare', x: lure.x, z: lure.z }) };
   }
-  if (titan.blasts < 4 && res.air > 3) return { st: 'watch', why: 'titan-horn', run: () => send(state, bot, { k: 'horn', on: true }) };
+  // The horn needs power: an expert lights the generator from the same room before it runs dry.
+  if (titan.blasts < TITAN.blasts && res.power < 25 && !state.gen.on && res.oil > 10 && !state.mods.hornFree) return { st: 'watch', why: 'gen', run: () => send(state, bot, { k: 'gen', on: true }) };
+  if (titan.blasts < TITAN.blasts && res.air > 3) return { st: 'watch', why: 'titan-horn', run: () => send(state, bot, { k: 'horn', on: true }) };
   if (res.air <= 3) return { st: 'watch', why: 'titan-breath', run: () => send(state, bot, { k: 'crank', on: true }) };
   return { st: 'gallery', why: 'titan-repair', run: () => send(state, bot, { k: 'repair', on: true }) };
 }

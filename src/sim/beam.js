@@ -169,8 +169,8 @@ export function stepLamp(state, dt) {
   // Oil (litres per second). Sweep is cheap; spot follows the raw intensity.
   let burn = 0;
   if (on) {
-    if (b.mode === 'sweep') burn = 6.5 / 60;
-    else burn = (14 / 60) * Math.max(0.55, Math.min(1.6, (20 / b.r) ** 1.5)) * (b.over ? 1.8 : 1);
+    if (b.mode === 'sweep') burn = 8 / 60;
+    else burn = (17 / 60) * Math.max(0.55, Math.min(1.6, (20 / b.r) ** 1.5)) * (b.over ? 1.8 : 1);
     burn *= m.oilBurnMul;
   }
   if (state.gen.on && res.oil > 0 && res.power < m.powerMax) {

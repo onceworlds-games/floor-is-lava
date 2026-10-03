@@ -440,6 +440,13 @@ export class AudioEngine {
     this.tone(this.vary('titan', 36, 0.1), { type: 'sawtooth', attack: 0.6, decay: 2.5, gain: 0.4, filter: 180 });
     this.burst({ decay: 2.5, gain: 0.5, lp: 120 });
   }
+  /** A ship turns Guided: two soft bell notes a fifth apart, the second a breath later. */
+  guided() {
+    const f = this.vary('guided', 587, 0.03);
+    this.tone(f, { type: 'sine', decay: 0.5, gain: 0.07 });
+    this.tone(f * 2.76, { type: 'sine', decay: 0.25, gain: 0.015 });
+    setTimeout(() => this.tone(f * 1.5, { type: 'sine', decay: 0.7, gain: 0.07 }), 90);
+  }
   dawnBell() {
     for (let i = 0; i < 3; i++) setTimeout(() => this.bell(50), i * 900);
   }
@@ -532,7 +539,9 @@ export class AudioEngine {
       case 'dawn': return this.dawnBell();
       case 'over': return ev.result === 'dawn' ? null : this.lose();
       case 'titan-down': return this.win();
-      case 'guided': return this.tone(this.vary('guided', 660, 0.08), { type: 'sine', decay: 0.3, gain: 0.08 });
+      case 'guided': return this.guided();
+      case 'titan-blast': return this.tone(this.vary('blast', 48, 0.06), { type: 'sawtooth', attack: 0.02, decay: 0.7, gain: 0.3, filter: 260 });
+      case 'lure-hit': return this.flare();
       case 'mode': case 'lens': case 'gen': return this.click();
       case 'oil': return this.burst({ decay: 0.8, gain: 0.2, lp: 600 });
       case 'crate': return this.thunk();

@@ -59,7 +59,7 @@ export function computeMods(season) {
   m.rangeMul *= 1 + 0.1 * t('lens');
   if (t('fins')) m.heatMul *= 0.75;
   if (t('shutter')) m.strobeKeep = true;
-  m.oilAdd += 40 * t('tank');
+  m.oilAdd += 30 * t('tank');
   if (t('shutters')) m.waveMul *= 0.7;
   if (t('door')) m.doorDmgMul *= 0.5;
   if (t('rod')) m.rod = true;

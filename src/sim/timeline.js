@@ -47,7 +47,7 @@ export function buildTimeline(rng, { night, mods, weather }) {
   for (let i = 0; i < ships; i++) slots.push(first + ((last - first) * (i + range(rng, 0.15, 0.85))) / ships);
   for (let i = 0; i < slots.length; i++) {
     const type = weighted(rng, weights).id;
-    const distress = night >= 2 && rnd(rng) < 0.12;
+    const distress = night >= 2 && rnd(rng) < (night >= 4 ? 0.16 : 0.1);
     events.push({ t: slots[i], kind: 'ship', type, name: nextName(), hail: mods.ascHail, distress, d: range(rng, -6, 6) });
     if (mods.convoy && i % 2 === 0) events.push({ t: slots[i] + 7, kind: 'ship', type: weighted(rng, weights).id, name: nextName(), hail: mods.ascHail, distress: false, d: range(rng, -6, 6) });
   }

@@ -6,6 +6,14 @@ import { stagger } from './night.js';
 
 const light = { I: 0, lens: 'white', sweep: false, flare: false };
 
+/**
+ * The Tide Titan's three faces: seconds of hard light on its eyes, harpoon hits on its arms, horn blasts and lit lures at
+ * its maw. Each face has `face` seconds before it slams the tower and starts over; each wears at the tower (`chip` per
+ * second) and its swell shoves the ships (`swell` times the drift).
+ */
+// It is the season's last word: tuned so an expert keeper with a good build puts it under a little over a third of the time.
+export const TITAN = { eyes: 35.5, hits: 8, blasts: 4, lures: 2, face: 60, swell: 1.8, chip: [0, 1.2, 2.0, 1.8] };
+
 function reefSpot(state, u, side) {
   const route = state.route;
   const p = routeAt(route, route.L * u);
@@ -59,7 +67,7 @@ export function spawnHostile(state, ev) {
       break;
     }
     case 'titan': {
-      h = { ...base, x: 0, z: 150, phase: 1, phaseLeft: 75, lightAcc: 0, harpoons: 0, blasts: 0, blastAcc: 0, flares: 0, lures: [], tellLeft: 20 };
+      h = { ...base, x: 0, z: 150, phase: 1, phaseLeft: TITAN.face, lightAcc: 0, harpoons: 0, blasts: 0, blastAcc: 0, flares: 0, lures: [], tellLeft: 20 };
       break;
     }
     default:
@@ -199,7 +207,7 @@ export function stepHostiles(state, dt) {
         stagger(state);
       }
       if (h.type === 'titan') state.log.push('It is here.');
-      if (h.type === 'titan') h.phaseLeft = 75;
+      if (h.type === 'titan') h.phaseLeft = TITAN.face;
       continue;
     }
     lightAt(state, h.x, h.z, light);
@@ -253,8 +261,9 @@ export function stepHostiles(state, dt) {
             state.fx.push({ k: 'scatter', x: 0, z: 0, n: 1 });
             if (h.n <= 0) h.st = 'gone';
           }
-          if (h.life > 35) {
-            h.st = 'gone'; // they tire and slide back
+          // They tire and slide back; on the first night sooner, so a new keeper learns the door without losing the tower.
+          if (h.life > (state.night <= 1 ? 20 : 35)) {
+            h.st = 'gone';
             state.fx.push({ k: 'scatter', x: 0, z: 0, n: h.n });
           }
         }
@@ -355,21 +364,22 @@ export function stepHostiles(state, dt) {
 
 function stepTitan(state, h, dt, light, lit) {
   h.phaseLeft -= dt;
+  // Every face wears at the tower while it lasts, and its swell (see stepShips) shoves the ships toward the reef.
+  const chip = TITAN.chip[h.phase] || 0;
+  state.res.integ = Math.max(0, state.res.integ - chip * dt);
+  state.stats.damage += chip * dt;
   if (h.phase === 1) {
-    // Eyes: it only comes closer while unlit. Light it hard for 20 s in all.
+    // Eyes: it only comes closer while unlit. Light it hard (I >= 1.5) for TITAN.eyes seconds in all.
     if (lit && light.I >= 1.5) h.lightAcc += dt;
     else h.z = Math.max(60, h.z - 1.5 * dt);
-    if (h.lightAcc >= 20) titanPhase(state, h, 2);
+    if (h.lightAcc >= TITAN.eyes) titanPhase(state, h, 2);
   } else if (h.phase === 2) {
-    // Arms: six harpoon hits; it hammers the tower meanwhile.
-    state.res.integ = Math.max(0, state.res.integ - 1.2 * dt);
-    state.stats.damage += 1.2 * dt;
-    if (h.hit >= 6) titanPhase(state, h, 3);
+    // Arms: TITAN.hits harpoon hits.
+    if (h.hit >= TITAN.hits) titanPhase(state, h, 3);
   } else if (h.phase === 3) {
-    // Maw: three blasts of the horn and two flares on its lures.
+    // Maw: TITAN.blasts blasts of the horn and a flare on each lure.
     if (!h.lures.length) h.lures = [{ x: -40, z: 110, hit: 0 }, { x: 45, z: 120, hit: 0 }];
-    state.res.integ = Math.max(0, state.res.integ - 0.8 * dt);
-    if (h.blasts >= 4 && h.flares >= 2) {
+    if (h.blasts >= TITAN.blasts && h.flares >= TITAN.lures) {
       h.st = 'gone';
       state.flags.titanDown = true;
       state.fx.push({ k: 'titan-down' });
@@ -381,15 +391,21 @@ function stepTitan(state, h, dt, light, lit) {
     state.res.integ = Math.max(0, state.res.integ - 15);
     state.fx.push({ k: 'titan-slam' });
     stagger(state);
-    h.phaseLeft = 75;
+    h.phaseLeft = TITAN.face;
+    // A face that outlasts the keeper also restocks what it asks for, so a missed shot is a cost, not a dead end.
+    if (h.phase === 2 && state.res.harpoons < 1) state.res.harpoons = 1;
+    if (h.phase === 3 && state.res.flares < 1 && h.flares < TITAN.lures) state.res.flares = 1;
   }
 }
 
 function titanPhase(state, h, phase) {
   h.phase = phase;
-  h.phaseLeft = 75;
+  h.phaseLeft = TITAN.face;
   h.hit = 0;
   h.z = Math.min(h.z, 90);
+  // The keeper's reserve opens for the face that needs it: never a Titan that can't be finished for want of iron or fire.
+  if (phase === 2 && state.res.harpoons < Math.ceil(TITAN.hits / state.mods.harpoonDmgMul)) state.res.harpoons = Math.ceil(TITAN.hits / state.mods.harpoonDmgMul);
+  if (phase === 3 && state.res.flares < TITAN.lures) state.res.flares = TITAN.lures;
   state.fx.push({ k: 'titan-phase', phase });
   state.log.push(phase === 2 ? 'Its arms are on the rail. Iron, now.' : 'The maw. Horn, and fire on the lures.');
 }

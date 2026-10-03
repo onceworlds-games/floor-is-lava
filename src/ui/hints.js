@@ -8,7 +8,7 @@ const HINTS = [
   { id: 'drowned', when: (s, me) => me.st === 'lantern' && s.hostiles.some((h) => h.type === 'drowned' && h.st === 'climb'), done: (s) => !s.hostiles.some((h) => h.type === 'drowned' && h.st === 'climb'), text: () => 'BURN THE CRAWLERS', max: 3 },
   { id: 'door', when: (s) => s.hostiles.some((h) => h.type === 'drowned' && h.st === 'door'), done: (s) => !s.hostiles.some((h) => h.type === 'drowned' && h.st === 'door'), text: () => 'GALLERY: FLARE THE DOOR', max: 3 },
   { id: 'heat', when: (s, me) => me.st === 'lantern' && s.beam.heat > 70, done: (s) => s.beam.heat < 50, text: () => 'SWEEP TO COOL', max: 3 },
-  { id: 'radio', when: (s, me) => me.st !== 'watch' && s.ships.some((x) => x.needs && x.st === 'distress'), done: (s) => !s.ships.some((x) => x.needs && x.st === 'distress'), text: () => 'WATCH ROOM: RADIO', max: 3 },
+  { id: 'radio', when: (s, me) => s.ships.some((x) => x.st === 'distress') && (me.st !== 'watch' || s.ships.some((x) => x.st === 'distress' && x.guided > 0)), done: (s) => !s.ships.some((x) => x.st === 'distress'), text: (t, s) => (s && s.ships.some((x) => x.st === 'distress' && x.guided > 0) ? 'WATCH ROOM: RADIO IT' : 'LIGHT IT, THEN RADIO'), max: 3 },
   { id: 'siren', when: (s) => s.hostiles.some((h) => h.type === 'siren' && h.st === 'sing' && h.silenced <= 0), done: (s) => !s.hostiles.some((h) => h.type === 'siren' && h.st === 'sing' && h.silenced <= 0), text: () => 'AMBER QUIETS HER', max: 2 },
   { id: 'mimic', when: (s) => s.hostiles.some((h) => h.type === 'mimic' && h.st === 'lure'), done: (s) => !s.hostiles.some((h) => h.type === 'mimic' && h.st === 'lure'), text: () => 'BLUE SHOWS LIES', max: 2 },
   { id: 'wraith', when: (s) => s.ships.some((x) => x.hidden), done: (s) => !s.ships.some((x) => x.hidden), text: () => 'HORN, OR A FLARE', max: 2 },
@@ -47,7 +47,7 @@ export class Hints {
       if (h.done(state, me) || this.timer > 10) {
         if (this.timer > 10) this.cool[h.id] = this.clock + 20;
         this.active = null;
-      } else return h.text(this.touch);
+      } else return h.text(this.touch, state);
     }
     for (const h of HINTS) {
       if ((seen[h.id] || 0) >= h.max || (this.cool[h.id] || 0) > this.clock) continue;
@@ -55,7 +55,7 @@ export class Hints {
         seen[h.id] = (seen[h.id] || 0) + 1;
         this.active = h;
         this.timer = 0;
-        return h.text(this.touch);
+        return h.text(this.touch, state);
       }
     }
     return null;

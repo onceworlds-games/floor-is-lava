@@ -12,6 +12,7 @@ const flag = (n, d) => (args.includes(`--${n}`) ? args[args.indexOf(`--${n}`) + 
 const SEEDS = Number(flag('seeds', 24));
 const QUICK = args.includes('--quick');
 const RELIC_TABLE = args.includes('--relics');
+const RELIC_SEEDS = Number(flag('relic-seeds', Math.max(SEEDS, 48)));
 
 const BUILDS = {
   bare: { keeper: 'ismay', site: 'skerry-rock', asc: 0, upgrades: {}, relics: [], charter: null, almanacRead: [], rep: 60 },
@@ -54,9 +55,9 @@ function summarise(rows) {
 const pct = (x) => `${Math.round(x * 100)}%`;
 const line = (label, s) => console.log(`${label.padEnd(34)} saved ${pct(s.savedRate).padStart(4)}  dawn ${pct(s.dawn).padStart(4)}  oil ${pct(s.oil).padStart(4)}  integ ${String(Math.round(s.integ)).padStart(3)}  coins ${String(Math.round(s.coins)).padStart(4)}  cracks ${s.cracks.toFixed(2)}  oilOut ${pct(s.oilOut)}`);
 
-function run(label, cfg) {
+function run(label, cfg, seeds = SEEDS) {
   const rows = [];
-  for (let seed = 1; seed <= SEEDS; seed++) rows.push(playNight({ ...cfg, seed }));
+  for (let seed = 1; seed <= seeds; seed++) rows.push(playNight({ ...cfg, seed }));
   const s = summarise(rows);
   line(label, s);
   return s;
@@ -75,10 +76,12 @@ r.n6sweep = run('Night 6, sweep-only, mid', { night: 6, build: BUILDS.mid, bot: 
 r.n5sweep = run('Night 5, sweep-only, mid', { night: 5, build: BUILDS.mid, bot: 'sweep' });
 r.n6spot = run('Night 6, spot-only, no tank', { night: 6, build: { ...BUILDS.mid, upgrades: { ...BUILDS.mid.upgrades, tank: 0 } }, bot: 'spot' });
 r.n9expert = run('Night 9, expert, good', { night: 9, build: BUILDS.good, bot: 'expert' });
-r.n12expert = run('Night 12, expert, good', { night: 12, build: BUILDS.good, bot: 'expert' });
-r.n12basic = run('Night 12, basic, good', { night: 12, build: BUILDS.good, bot: 'basic' });
+// The finale is won or lost whole, so its rows take at least 48 seeds: 24 coin flips swing by ten points.
+const FINALE = Math.max(SEEDS, 48);
+r.n12expert = run(`Night 12, expert, good (${FINALE})`, { night: 12, build: BUILDS.good, bot: 'expert' }, FINALE);
+r.n12basic = run(`Night 12, basic, good (${FINALE})`, { night: 12, build: BUILDS.good, bot: 'basic' }, FINALE);
 if (!QUICK) {
-  r.n12asc3 = run('Night 12, expert, good, Storm 3', { night: 12, build: { ...BUILDS.good, asc: 3 }, bot: 'expert' });
+  r.n12asc3 = run(`Night 12, expert, good, Storm 3 (${FINALE})`, { night: 12, build: { ...BUILDS.good, asc: 3 }, bot: 'expert' }, FINALE);
   r.n6gale = run('Night 6, expert, mid, gale', { night: 6, build: BUILDS.mid, bot: 'expert', weather: 'gale' });
   r.n6fog = run('Night 6, expert, mid, fog', { night: 6, build: BUILDS.mid, bot: 'expert', weather: 'fog' });
 }
@@ -121,18 +124,20 @@ if (!QUICK) {
 }
 
 if (RELIC_TABLE) {
-  console.log('\nRelics: expert on night 9 with the good build, each relic swapped in (delta in win points)');
-  const base = run('  none', { night: 9, build: { ...BUILDS.good, relics: [] }, bot: 'expert' });
+  // The win that matters is the season's: dawn on night 12 against the Titan. Each relic alone in the good build.
+  console.log(`\nRelics: expert on night 12 with the good build and that one relic, ${RELIC_SEEDS} seeds (win = dawn; delta in points)`);
+  const base = run('  none', { night: 12, build: { ...BUILDS.good, relics: [] }, bot: 'expert' }, RELIC_SEEDS);
   const deltas = [];
   for (const relic of RELICS) {
-    const s = run(`  ${relic.name}`, { night: 9, build: { ...BUILDS.good, relics: [relic.id] }, bot: 'expert' });
+    const s = run(`  ${relic.name}`, { night: 12, build: { ...BUILDS.good, relics: [relic.id] }, bot: 'expert' }, RELIC_SEEDS);
     deltas.push({ id: relic.id, d: Math.round((s.dawn - base.dawn) * 100), saved: Math.round((s.savedRate - base.savedRate) * 100) });
   }
-  const worst = deltas.slice().sort((a, b) => b.d - a.d);
-  console.log(`  best ${worst[0].id} ${worst[0].d > 0 ? '+' : ''}${worst[0].d}, worst ${worst[worst.length - 1].id} ${worst[worst.length - 1].d}`);
+  const order = deltas.slice().sort((a, b) => b.d - a.d);
+  const out = deltas.filter((x) => x.d > 12 || x.d < -8);
+  console.log(`  best ${order[0].id} ${order[0].d > 0 ? '+' : ''}${order[0].d}, worst ${order[order.length - 1].id} ${order[order.length - 1].d}; outside +12/-8: ${out.length ? out.map((x) => `${x.id} ${x.d}`).join(', ') : 'none'}`);
   r.relics = deltas;
 }
 
 console.log(`\nTargets: n1 basic saved >= 85% (${pct(r.n1basic.savedRate)}), n1 tower never lost (${pct(r.n1basic.dawn)} dawn), n6 expert >= 75% (${pct(r.n6expert.savedRate)}), n6 lazy 35-50% (${pct(r.n6lazy.savedRate)}),`);
-console.log(`n12 expert wins 30-45% (${pct(r.n12expert.titan)}), n12 average <= 8% (${pct(r.n12basic.titan)}), oil left 10-25% (expert n6 ${pct(r.n6expert.oil)}), sweep-only loses n5+ (${pct(r.n5sweep.savedRate)} saved)`);
+console.log(`n12 expert wins 30-45% (${pct(r.n12expert.dawn)} dawn, Titan down ${pct(r.n12expert.titan)}), n12 average <= 8% (${pct(r.n12basic.dawn)}), oil left 10-25% (expert n6 ${pct(r.n6expert.oil)}), sweep-only loses n5+ (${pct(r.n5sweep.savedRate)} saved)`);
 console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s`);

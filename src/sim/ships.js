@@ -3,8 +3,12 @@ import { SHIPS } from './data/ships.js';
 import { shipPos, reefAt, routeAt } from './route.js';
 import { lightAt } from './beam.js';
 import { noise1, range } from './rng.js';
+import { TITAN } from './hostiles.js';
 
 const light = { I: 0, lens: 'white', sweep: false, flare: false };
+
+/** Seconds a ship with a dead engine stays afloat without a light and a radio order. */
+export const DISTRESS_TIME = 60;
 
 export function spawnShip(state, ev) {
   const def = SHIPS[ev.type] || SHIPS.smack;
@@ -13,7 +17,7 @@ export function spawnShip(state, ev) {
     id, type: def.id, name: String(ev.name || def.name).slice(0, 24), s: 0, d: Number.isFinite(ev.d) ? ev.d : 0, v: def.speed,
     st: 'sail', credit: 0, guided: 0, lit: 0, sweepLit: 0, order: null, orderLeft: 0, anchorLeft: 0, hidden: 0, seen: 0,
     sinkLeft: 0, special: ev.special || null, ds: state.counter * 31 + 7, dStop: ev.distress ? range(state.rng, state.route.L * 0.3, state.route.L * 0.6) : 0,
-    needs: 0, gunsCd: 10, held: 0, blocked: 0, stall: 0,
+    needs: 0, gunsCd: 10, held: 0, blocked: 0, stall: 0, distressLeft: 0,
   };
   if (ship.special === 'chaser') ship.v = def.speed * 1.1;
   state.ships.push(ship);
@@ -28,10 +32,10 @@ function lurePull(state, ship, pos) {
   for (const h of state.hostiles) {
     if (h.type === 'siren' && h.st === 'sing' && h.silenced <= 0 && h.scared <= 0) {
       const dist = Math.hypot(h.x - pos.x, h.z - pos.z);
-      if (dist < 90) pull += 1.5 * Math.sign(h.side) * (1 - dist / 180);
+      if (dist < 90) pull += 1.8 * Math.sign(h.side) * (1 - dist / 180);
     } else if (h.type === 'mimic' && h.st === 'lure' && !ship.guided) {
       const dist = Math.hypot(h.x - pos.x, h.z - pos.z);
-      if (dist < 80) pull += 1.0 * Math.sign(h.side);
+      if (dist < 80) pull += 1.3 * Math.sign(h.side);
     }
   }
   return pull;
@@ -110,8 +114,10 @@ export function giveOrder(state, ship, order) {
   ship.orderLeft = order === 'anchor' ? 40 : 12;
   if (order === 'anchor') ship.anchorLeft = 40;
   else ship.anchorLeft = 0;
-  if (ship.st === 'distress' && (order === 'port' || order === 'starboard') && ship.credit >= 1.5) {
+  // A dead engine restarts on a steering order once the light has found it (Guided, or nearly).
+  if (ship.st === 'distress' && (order === 'port' || order === 'starboard') && (ship.guided > 0 || ship.credit >= 1)) {
     ship.st = 'sail';
+    ship.distressLeft = 0;
     state.fx.push({ k: 'engine', id: ship.id });
   }
   ship.needs = 0;
@@ -124,6 +130,8 @@ export function stepShips(state, dt) {
   const route = state.route;
   const storm = state.weather.storm;
   const t = state.t;
+  let swell = 1;
+  for (const h of state.hostiles) if (h.type === 'titan' && h.st === 'fight') swell = TITAN.swell;
   for (const ship of state.ships) {
     if (ship.st === 'saved' || ship.st === 'lost') continue;
     if (ship.st === 'wreck') {
@@ -154,7 +162,7 @@ export function stepShips(state, dt) {
     ship.guided = Math.max(0, ship.guided - dt);
     // Lateral motion: current and swell push it off the line; light and orders pull it back.
     const p = routeAt(route, ship.s);
-    let drift = (0.35 + 1.3 * storm) * m.driftMul * def.driftMul;
+    let drift = (0.35 + 1.3 * storm) * m.driftMul * def.driftMul * swell;
     if (p.narrow) drift *= m.narrowsDriftMul;
     if (ship.sweepLit && m.ascSweepOrient) drift *= 0.7;
     const anchored = ship.order === 'anchor' && ship.anchorLeft > 0;
@@ -200,6 +208,7 @@ export function stepShips(state, dt) {
       ship.st = 'distress';
       ship.dStop = 0;
       ship.needs = 1;
+      ship.distressLeft = DISTRESS_TIME;
       state.fx.push({ k: 'distress', id: ship.id, name: ship.name });
       state.log.push(`${ship.name}: engine gone.`);
     }
@@ -217,6 +226,14 @@ export function stepShips(state, dt) {
     const reef = reefAt(route, ship.s, ship.d);
     const danger = Math.abs(ship.d) / reef;
     ship.needs = ship.st === 'distress' || (danger > 0.6 && ship.guided <= 0) || (ship.hidden && ship.order !== 'anchor') ? 1 : 0;
+    // A dead engine left alone takes water: light it and give it an order before it founders.
+    if (ship.st === 'distress') {
+      ship.distressLeft = Math.max(0, (Number.isFinite(ship.distressLeft) ? ship.distressLeft : DISTRESS_TIME) - dt);
+      if (ship.distressLeft <= 0) {
+        wreckShip(state, ship, 'foundered');
+        continue;
+      }
+    }
     // The reef.
     if (Math.abs(ship.d) > reef) wreckShip(state, ship, ship.hidden ? 'in the fog' : lurePull(state, ship, pos) !== 0 ? 'lured' : 'drifted');
     else if (ship.s >= route.L) saveShip(state, ship);
