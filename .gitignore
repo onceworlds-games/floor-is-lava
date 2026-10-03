@@ -4,3 +4,7 @@ coverage
 .DS_Store
 *.log
 .vite
+
+# Local captures and scratch output
+/*.png
+/*.jpg
