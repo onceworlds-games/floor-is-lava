@@ -13,6 +13,7 @@ import { SITES } from '../sim/data/sites.js';
 import { buildRoute, SEA_R } from '../sim/route.js';
 import { poolCentre, spotIntensity, lampIsOn, SWEEP_HALF, SWEEP_LAMP, maxDist } from '../sim/beam.js';
 import { drawChart } from '../ui/chart.js';
+import { SUN_YAW, sunOnScreen } from './sun.js';
 
 const FLIGHTS = { lantern: 3, gallery: 2, watch: 1, cellar: 0 };
 const tmp = new THREE.Vector3();
@@ -103,6 +104,16 @@ export class View {
   }
 
   /**
+   * Where the sunrise stands in the picture once the keeper has turned to it (fractions from the top left), or null when it is
+   * out of view: the page that closes the night asks, and keeps clear of it (ui/screens.js).
+   */
+  sunScreen() {
+    const rig = this.rig;
+    const turns = !this.reduced && this.tower?.anchors()[rig.station]?.look === 'beam';
+    return sunOnScreen(this.camera.position, turns ? SUN_YAW : rig.yaw, rig.pitch, this.camera.fov, this.camera.aspect);
+  }
+
+  /**
    * state: the night state to draw (host's own or the interpolated copy); crew: my crew record or null;
    * input: { yaw (manual offset), pitch }; opts: { reducedMotion, bright, cosmetics, fx }.
    */
@@ -115,6 +126,7 @@ export class View {
     const beam = state.beam;
     const weather = state.weather;
     const reduced = Boolean(opts.reducedMotion);
+    this.reduced = reduced;
     // Camera rig.
     const rig = this.rig;
     const anchors = this.tower.anchors();
@@ -167,8 +179,7 @@ export class View {
       const dawnTurn = !reduced && !opts.camera && (state.phase === 'dawn' || (state.phase === 'over' && state.result === 'dawn')) && anchors[rig.station].look === 'beam';
       if (dawnTurn) {
         this.dawnLook = Math.min(1, (this.dawnLook || 0) + dt * 0.35);
-        const sunYaw = Math.atan2(0.951, -0.285);
-        let d = sunYaw - yaw;
+        let d = SUN_YAW - yaw;
         d = Math.atan2(Math.sin(d), Math.cos(d));
         yaw += d * (this.dawnLook * this.dawnLook * (3 - 2 * this.dawnLook));
       } else this.dawnLook = 0;

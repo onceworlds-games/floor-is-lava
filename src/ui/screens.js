@@ -627,11 +627,17 @@ export class Screens {
   }
 
   // ---- The end of a night, over the dawn.
-  // The night's page, over the dawn: it settles low on the screen a moment after the bell, leaving the sunrise above.
-  nightOver(ledger, isHost, onContinue, onAgain = null) {
+  // The night's page, over the dawn: the sunrise is the picture, so the page waits a few seconds for it, then slides in below it
+  // and never covers it. `sun`: where the sun stands ({ x, y } from the top left, 0..1; View.sunScreen) or null when it's out of view.
+  nightOver(ledger, isHost, onContinue, onAgain = null, sun = null) {
     const s = el('div', `screen nightover ${ledger.result === 'dawn' ? 'dawn' : 'lost'}`);
+    if (ledger.result === 'dawn' && sun) {
+      s.classList.add('sunny');
+      s.style.setProperty('--sun-y', sun.y.toFixed(3));
+      // On a short wide screen (a phone on its side) there is no room under the sun: the page stands beside it, on the side it isn't.
+      if (sun.x > 0.55) s.classList.add('left');
+    }
     const book = el('div', 'book');
-    book.style.width = 'min(94vw, 520px)';
     const head = el('div', 'head');
     head.append(el('h2', '', ledger.result === 'dawn' ? 'Dawn' : ledger.result === 'disaster' ? 'The tower fell' : 'Dismissed'));
     head.append(el('span', 'coins', `+${ledger.earned}`));

@@ -272,7 +272,7 @@ async function boot() {
     input.locked = true;
     controls.set(null);
     screens.hideOverlays();
-    screens.nightOver(ledger, session.isHost, () => session.morning(), againFor());
+    screens.nightOver(ledger, session.isHost, () => session.morning(), againFor(), view.sunScreen());
   }
 
   /** On a lost season's last page, the host can start the next season at once (same keeper, same rock). */
@@ -288,7 +288,7 @@ async function boot() {
   /** The host moved: redraw the screen that has host-only buttons (Start-of-night, Morning, the shop). */
   function onRole() {
     if (G.phase === 'day') showDay();
-    else if (G.phase === 'over' && G.ledger) screens.nightOver(G.ledger, session.isHost, () => session.morning(), againFor());
+    else if (G.phase === 'over' && G.ledger) screens.nightOver(G.ledger, session.isHost, () => session.morning(), againFor(), view.sunScreen());
     else if (G.phase === 'dusk' && session.state) screens.dusk(session.state, session.isHost);
   }
 
