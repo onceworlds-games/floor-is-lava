@@ -29,7 +29,7 @@ export async function runPoster(name) {
   fx.quality = 2;
   fx.seed(2026);
   if (name === 'cover') cover(ctx, fx, W, H);
-  else if (name === 'action') action(ctx, fx, W, H);
+  else if (name === 'action') towerScene(ctx, fx, W, H);
   else if (name === 'win') win(ctx, fx, W, H);
   else if (name === 'icon') icon(ctx, fx, W, H);
   else if (name.startsWith('badge-')) badge(ctx, name.slice(6), W, H);
@@ -73,10 +73,10 @@ function bubbles(fx, level, x0, x1, n) {
 }
 
 // ------------------------------------------------------------------ cover: the tower, six climbers, the title
-function cover(ctx, fx, W, H) {
+function towerScene(ctx, fx, W, H) {
   const tower = generateTower(21, { width: 24, height: 14.5 });
   const world = makeWorld(tower, { floorUntil: 4 });
-  const v = viewFor(W, H, 31, 3.6, -1.8);
+  const v = viewFor(W, H, 31, 12, -1.8);
   const t = 20;
   const L = 0.45;
   drawWorldBack(ctx, v, world, t, 1.3, 0);
@@ -117,20 +117,24 @@ function cover(ctx, fx, W, H) {
   age(fx, 0.28);
   drawLava(ctx, v, L, 1.3);
   fx.draw(ctx, v);
-  // the name, big, over the dark curtain on the left
-  label(ctx, 'THE FLOOR IS', 285, 92, 78);
-  bigText(ctx, 'LAVA', 285, 240, 228, '#ffb020', '#c8321a');
+}
+
+// ------------------------------------------------------------------ cover: the leap over the lava, with the name above it
+function cover(ctx, fx, W, H) {
+  action(ctx, fx, W, H, 72, -0.3);
+  label(ctx, 'THE FLOOR IS', W / 2, 62, 62);
+  bigText(ctx, 'LAVA', W / 2, 158, 150, '#ffb020', '#c8321a');
 }
 
 // ------------------------------------------------------------------ action: a leap from a couch to a bookshelf, the lava just below
-function action(ctx, fx, W, H) {
+function action(ctx, fx, W, H, S = 88, camY = -0.5) {
   const platforms = [
     { i: 0, kind: 'floor', f: 'floor', x: 7, y: 0, w: 18, c: 0, row: -1 },
     { i: 1, kind: 'static', f: 'couch', x: 3.7, y: 2.7, w: 4.2, c: 1, row: 0 },
     { i: 2, kind: 'static', f: 'shelf', x: 11.1, y: 3.8, w: 3.6, c: 0, row: 1 },
   ];
   const world = makeWorld({ w: 14, lobby: false, goal: -1, goalY: 40, platforms }, { floorUntil: 0 });
-  const v = viewFor(W, H, 88, 7.3, -0.5);
+  const v = viewFor(W, H, S, 7.3, camY);
   const t = 10;
   const L = 2.15;
   drawWorldBack(ctx, v, world, t, 2.2, 0);
