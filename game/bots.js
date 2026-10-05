@@ -126,7 +126,7 @@ export function brainInput(world, an, b, br, t, L, out) {
 function jumpNow(br, b, xl, q, danger, out) {
   br.plan = { xl, q };
   br.bias = (br.rng() * 2 - 1) * br.sk.execNoise * 2;
-  br.hold = br.rng() < br.sk.miss * (danger ? 1.5 : 1) ? 5 : 999; // panic makes slips likelier // a clumsy hop: let go of jump early
+  br.hold = br.rng() < br.sk.miss * (danger ? 1.5 : 1) ? 5 : 999; // a clumsy hop lets go of jump early (panic makes it likelier)
   out.tap = true;
   out.jump = true;
   out.x = clamp(steerTo(b, xl) + br.bias, -1, 1);
@@ -218,7 +218,7 @@ function onGround(world, an, b, br, t, danger, react, out) {
 function inAir(world, an, b, br, t, danger, react, out) {
   const P = world.platforms;
   let plan = br.plan;
-  if (br.tick >= br.nextDecide || !plan) {
+  if (br.tick >= br.nextDecide) {
     br.nextDecide = br.tick + Math.max(2, react >> 1);
     if (plan) {
       // the same aim as when it was chosen (a rolling chair's moves with it)

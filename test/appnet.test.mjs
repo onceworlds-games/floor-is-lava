@@ -229,3 +229,69 @@ test('the page remembers nothing of the last match: the lobby is back, then a sp
   const presence = pageRoom.me.presence;
   assert.ok(presence && presence.r === 0, 'a spectator publishes nothing new in a round');
 });
+
+test('an idle player burns, hops, floats up as a ghost and can fly about; the host hears it', () => {
+  frames(60 * 6);
+  dom.stats.texts.length = 0;
+  shared.players.get('h0').ready = true;
+  startMatch(['h0', 'p1']);
+  ow.controls.held.delete('jump');
+  let ghostMoved = false;
+  let startY = null;
+  for (let i = 0; i < 60 * 30; i++) {
+    const p = pageRoom.me.presence;
+    if (p && p.s === 2) {
+      ow.controls.stick.x = 1;
+      ow.controls.stick.y = -1; // up
+      startY ??= p.y;
+      if (p.y > startY + 1) ghostMoved = true;
+    }
+    frames(1);
+  }
+  ow.controls.stick.x = 0;
+  ow.controls.stick.y = 0;
+  const g = readG(pageRoom);
+  assert.ok(g, 'the round is on');
+  assert.ok(Object.prototype.hasOwnProperty.call(g.out, 'p1'), 'the host heard that the lava got p1');
+  assert.equal(pageRoom.me.presence.s, 2);
+  assert.ok(ghostMoved, 'the ghost flew up');
+  assert.ok(seen('HOT!') && seen('GHOST'), 'the hot hop, then a ghost');
+  assert.deepEqual(dom.problems, []);
+});
+
+test('every screen shape: a phone upright and sideways, a tablet, a wide window, reduced motion, low graphics', () => {
+  // finish this match so the lobby shows, with ready checks over the people there
+  for (let i = 0; i < 60 * 60 * 6 && shared.match.phase !== 'lobby'; i++) frames(1);
+  assert.equal(shared.match.phase, 'lobby');
+  shared.players.get('h0').ready = true;
+  shared.players.get('p1').ready = true;
+  shared.players.get('h0').presence = { x: 5, y: 3, vx: 2, vy: 4, o: 0, f: 1, s: 0, m: 0, r: 0 };
+  const sizes = [[360, 640], [640, 360], [800, 360], [844, 390], [1024, 768], [1366, 768], [1920, 1080], [320, 480], [200, 150]];
+  for (const reduced of [false, true]) {
+    ow.settings.reducedMotion = reduced;
+    ow.settings.quality = reduced ? 'low' : 'high';
+    for (const [w, h] of sizes) {
+      dom.resize(w, h);
+      dom.stats.texts.length = 0;
+      frames(40);
+      assert.ok(seen('ROUNDS'), `the lobby at ${w}x${h}`);
+      assert.equal(dom.canvas.width, w);
+    }
+  }
+  // a match at the smallest and the biggest, so every overlay is drawn at its extremes
+  for (const [w, h] of [[360, 640], [640, 360], [1920, 1080]]) {
+    dom.resize(w, h);
+    dom.stats.texts.length = 0;
+    const drive = autopilot(pageRoom, ow);
+    startMatch(['h0', 'p1']);
+    for (let i = 0; i < 60 * 60 * 9 && shared.match.phase !== 'lobby'; i++) {
+      drive(readG(pageRoom));
+      frames(1);
+    }
+    assert.equal(shared.match.phase, 'lobby', `a whole match at ${w}x${h}`);
+    assert.ok(seen('REACH THE BALLOON!') && seen('SAFE'));
+    assert.deepEqual(dom.problems, [], `${w}x${h}`);
+  }
+  ow.settings.reducedMotion = false;
+  ow.settings.quality = 'high';
+});

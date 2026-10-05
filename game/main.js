@@ -678,8 +678,9 @@ async function boot() {
   function drawArena(dt, mp) {
     const tl = nowMs() / 1000;
     const me = !titleOpen && !room.spectating;
-    camUpdate(dt, me ? lobbyBody.y : 2, me ? lobbyBody.on === 1 : true, NaN, false, -0.9, LOBBY_CEIL + 0.9);
-    if (titleOpen) cam.bottom = -0.9;
+    // the platform's Ready strip covers the bottom ~90 px: the floor sits above it
+    camUpdate(dt, me ? lobbyBody.y : 2, me ? lobbyBody.on === 1 : true, NaN, false, -125 / S, LOBBY_CEIL + 0.9);
+    if (titleOpen) cam.bottom = -2;
     setWorldView(lobbyWorld);
     drawWorldBack(ctx, view, lobbyWorld, tl, animT);
     descN = 0;
@@ -873,7 +874,8 @@ async function boot() {
         fx.smoke(scratch.x, scratch.y + 0.5, 6);
         if (id === myId) sound.ghost(1);
       }
-      feed(vis, scratch.x, scratch.y, scratch.vx, scratch.vy, scratch.o, status === 0 ? 0 : 1, dt, id === myId ? 1 : 0.3);
+      const audible = scratch.y > cam.bottom - 1 && scratch.y < cam.bottom + H / S + 1; // only what is on screen makes a sound
+      feed(vis, scratch.x, scratch.y, scratch.vx, scratch.vy, scratch.o, status === 0 ? 0 : 1, dt, id === myId ? 1 : audible ? 0.25 : 0);
       // a pillow wobbles under anyone's feet, not only mine
       if (status === 0 && id !== myId && scratch.o) {
         const si = standingOn(world, scratch.x, scratch.y, tk, 0.12);
@@ -945,6 +947,7 @@ async function boot() {
       barEntries.push({ ci: r.c, y: status === 2 && scratch.m > 0 ? scratch.m : scratch.y, st: status, me: id === myId });
     });
 
+    alive.sort((a, b) => (a.ring ? 1 : 0) - (b.ring ? 1 : 0)); // me on top
     // the camera: on me while I climb, else on whoever is highest (or the balloon as it leaves)
     let focus;
     let grounded = true;
@@ -974,7 +977,7 @@ async function boot() {
     if (m && m.st === 0 && g.phase === 'play') ui.drawWarnEdge(ctx, W, H, m.body.y - L, animT, fx.reduced);
     if (g.phase === 'banner') {
       const age = (room.matchNow() - (g.until - T.bannerMs)) / 1000;
-      ui.drawBanner(ctx, W, H, u, 'REACH THE BALLOON!', g.round, g.n, age, fx.reduced);
+      ui.drawBanner(ctx, W, H, u, 'REACH THE BALLOON!', age, fx.reduced);
     }
     if (g.phase === 'play' || g.phase === 'banner') {
       ui.drawShout(ctx, W, H, u, tk, fx.reduced);
@@ -1016,7 +1019,7 @@ async function boot() {
     let age = 10;
     if (compact) {
       const pnl = ui.drawResultsPanel(ctx, W, H, u);
-      floor = pnl.y + pnl.h - 26 * u;
+      floor = pnl.y + pnl.h - 46 * u;
     } else {
       floor = H - 44 * u;
       age = (room.matchNow() - (g.until - T.finalMs)) / 1000;

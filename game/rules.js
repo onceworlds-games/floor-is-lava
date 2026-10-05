@@ -26,7 +26,7 @@ export const PHYS = Object.freeze({
   landHalf: 0.22, // how far a ledge forgives a foot hanging off it
   bounceV: 19, // trampolines and beds
   wobble: 0.6, // pillows fall this long after being stood on...
-  crumbleGone: 4.0, // ...and are gone this long
+  crumbleGone: 3.4, // ...and are back 4 s after that
   dt: 1 / 60,
 });
 

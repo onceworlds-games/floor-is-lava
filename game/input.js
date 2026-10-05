@@ -49,7 +49,7 @@ export function createInput(ow) {
       if (pressed && !touchJump) tapLatch = true;
       touchJump = pressed;
       out.jump = keyUp || pressed;
-      out.down = keyDown || sy > 0.62;
+      out.down = keyDown || (sy > 0.62 && sy > Math.abs(sx) * 1.1); // mostly down, not a thumb drifting while it runs
       out.my = Math.max(-1, Math.min(1, (keyUp ? 1 : 0) - (keyDown ? 1 : 0) - sy));
       out.tap = tapLatch;
       tapLatch = false;

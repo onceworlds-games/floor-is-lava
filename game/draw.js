@@ -372,7 +372,7 @@ function pillows(ctx, v, x, y, w, c, state, since, now) {
     const f = since - 0.6;
     dy = -f * f * 7;
     alpha = clamp(1 - f * 1.4, 0, 1);
-  } else if (since >= 4.6 && since < 4.95) alpha = (since - 4.6) / 0.35; // it pops back
+  } else if (since >= 4 && since < 4.35) alpha = (since - 4) / 0.35; // it pops back
   if (alpha <= 0.02) return;
   ctx.globalAlpha = alpha;
   const rows = [
@@ -835,7 +835,7 @@ export function drawChar(ctx, v, c, now) {
   // name, the YOU arrow, the ready check: drawn flat, not squashed
   if (alpha > 0.05) {
     const top = sy + bob - (c.ghost ? 0.25 * u : 0) - (c.bot ? 1.62 : 1.3) * u * (1 + sq);
-    const size = clamp(S * 0.4, 11, 18);
+    const size = clamp(S * 0.46, 12, 20);
     ctx.globalAlpha = alpha;
     if (c.name) label(ctx, c.name, sx, top, size);
     let ty = top - size * 0.8;

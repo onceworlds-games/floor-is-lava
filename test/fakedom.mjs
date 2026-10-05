@@ -42,9 +42,10 @@ export function installFakeDom({ width = 800, height = 450, search = '', ow = nu
         return (...a) => {
           stats.calls++;
           for (const n of a) if (typeof n === 'number' && !Number.isFinite(n)) problems.push(`${String(p)} with ${n}: ${JSON.stringify(a)}`);
-          if (p === 'drawImage') {
-            // the first argument is an image: the numbers follow
-          }
+          // a real canvas throws on a negative radius, and an exception in the frame loop stops the game
+          if (p === 'arc' && a[2] < 0) problems.push(`arc with a negative radius: ${JSON.stringify(a)}`);
+          if (p === 'ellipse' && (a[2] < 0 || a[3] < 0)) problems.push(`ellipse with a negative radius: ${JSON.stringify(a)}`);
+          if (p === 'arcTo' && a[4] < 0) problems.push(`arcTo with a negative radius: ${JSON.stringify(a)}`);
         };
       return () => {
         stats.calls++;
@@ -65,7 +66,7 @@ export function installFakeDom({ width = 800, height = 450, search = '', ow = nu
     height,
     style: {},
     getContext: () => ctx,
-    getBoundingClientRect: () => ({ left: 0, top: 0, width, height }),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: globalThis.innerWidth, height: globalThis.innerHeight }),
     addEventListener() {},
   };
 
@@ -227,6 +228,12 @@ export function installFakeDom({ width = 800, height = 450, search = '', ow = nu
         }
         each?.(i);
       }
+    },
+    /** Turn the phone, change the window: the game redraws at the new size. */
+    resize(w, h) {
+      g.innerWidth = w;
+      g.innerHeight = h;
+      for (const fn of listeners.get('resize') ?? []) fn({ type: 'resize' });
     },
     /** Let time pass with no frames drawn (timers still run). */
     idle(ms) {

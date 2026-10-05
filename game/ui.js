@@ -286,19 +286,24 @@ export function drawCountdown(ctx, W, H, u, text, age, reduced) {
 }
 
 /** The round's goal in a few words, sliding in. */
-export function drawBanner(ctx, W, H, u, text, round, total, age, reduced) {
+export function drawBanner(ctx, W, H, u, text, age, reduced) {
   const k = reduced ? 1 : easeOutBack(clamp(age / 0.28, 0, 1));
   const out = clamp((age - 1.2) / 0.3, 0, 1);
   const y = H * 0.24 - (1 - k) * H * 0.3 - easeInOut(out) * H * 0.2;
-  const size = Math.max(34, 62 * u);
+  let size = Math.max(34, 62 * u);
   ctx.font = `${size}px ${FONT}`;
-  const tw = ctx.measureText(text).width;
+  let tw = ctx.measureText(text).width;
+  if (tw + size * 2.4 > W - 24) {
+    // a narrow screen: smaller type, the same ribbon
+    const fit = (W - 24) / (tw + size * 2.4);
+    size *= fit;
+    tw *= fit;
+  }
   const bw = Math.min(W - 24, tw + size * 2.4);
   const bh = size * 1.55;
   plate(ctx, W / 2 - bw / 2, y - bh / 2, bw, bh, '#ff5a2a', bh * 0.3, 6);
   balloonIcon(ctx, W / 2 - bw / 2 + size * 0.85, y, size * 0.7);
   label(ctx, text, W / 2 + size * 0.5, y, size);
-  if (total > 1) label(ctx, `ROUND ${round}/${total}`, W / 2, y - bh * 0.78, Math.max(20, 30 * u), { fill: GOLD });
 }
 
 /** "THE FLOOR IS... LAVA!" from round time t (seconds). */
@@ -331,9 +336,10 @@ export function drawHud(ctx, W, H, u, o) {
   const cw = clamp(190 * u, 130, 250);
   const ch = Math.max(54, 62 * u);
   const x = W / 2 - cw / 2;
-  plate(ctx, x, 8, cw, ch, '#3d2b52', ch * 0.28, 4);
-  label(ctx, o.total > 1 ? `ROUND ${o.round}/${o.total}` : 'ROUND', W / 2, 8 + ch * 0.34, Math.max(18, 28 * u));
-  label(ctx, o.left === 1 ? '1 left' : `${o.left} left`, W / 2, 8 + ch * 0.74, Math.max(15, 22 * u), { fill: '#cbb8ea', lw: 3 });
+  const y0 = W >= 600 ? 8 : 64; // the platform's buttons sit in the top left: a narrow screen starts below them
+  plate(ctx, x, y0, cw, ch, '#3d2b52', ch * 0.28, 4);
+  label(ctx, o.total > 1 ? `ROUND ${o.round}/${o.total}` : 'ROUND', W / 2, y0 + ch * 0.34, Math.max(18, 28 * u));
+  label(ctx, o.left === 1 ? '1 left' : `${o.left} left`, W / 2, y0 + ch * 0.74, Math.max(15, 22 * u), { fill: '#cbb8ea', lw: 3 });
   // your points
   const sw = Math.max(92, 118 * u);
   const sh = Math.max(46, 52 * u);
@@ -341,7 +347,7 @@ export function drawHud(ctx, W, H, u, o) {
   plate(ctx, sx, 10, sw, sh, '#3d2b52', sh * 0.3, 4);
   starIcon(ctx, sx + sh * 0.5, 10 + sh / 2, sh * 0.3);
   label(ctx, String(o.score), sx + sw * 0.62, 10 + sh / 2, Math.max(26, 36 * u));
-  return 10 + sh;
+  return Math.max(10 + sh, y0 + ch);
 }
 
 /** The height bar on the right: the lava's level, everyone's height and the balloon at the top. */
@@ -465,10 +471,11 @@ export function drawScoreboard(ctx, W, H, u, o, now) {
   const titleSize = Math.max(28, 44 * u);
   label(ctx, o.final ? 'FINAL' : `ROUND ${o.round}`, W / 2, Math.max(36, 44 * u), titleSize, { fill: GOLD });
   const top = Math.max(72, 84 * u);
-  const rowH = clamp(54 * u, 36, 64);
-  const maxRows = Math.max(3, Math.floor((H - top - 36) / (rowH + 6)));
-  let rows = o.rows;
-  let youIdx = rows.findIndex((r) => r.id === o.you);
+  const rows = o.rows;
+  const fit = (H - top - 30) / Math.min(rows.length, 8) - 6;
+  const rowH = clamp(Math.min(54 * u, fit), 30, 64);
+  const maxRows = Math.max(3, Math.floor((H - top - 30) / (rowH + 6)));
+  const youIdx = rows.findIndex((r) => r.id === o.you);
   let show = rows.slice(0, maxRows);
   if (youIdx >= maxRows) show = [...rows.slice(0, maxRows - 1), rows[youIdx]];
   const pw = clamp(560 * u, 300, W - 20);
@@ -510,7 +517,7 @@ export function drawScoreboard(ctx, W, H, u, o, now) {
 // ------------------------------------------------------------------ results
 /**
  * The podium. `v` is a world view for the results scene (x = 0 is the middle, y = 0 the podium's floor).
- * o: { ranked: [{ id, name, ci, bot, head, score, place }] best first, you, age, awards: { hotFeet: name|null, skyHigh: name|null }, vis(id) -> char extras }
+ * o: { ranked: [{ id, name, ci, bot, head, score, place }] best first, you, age, awards: { hotFeet: name|null, skyHigh: name|null } }
  */
 export function drawPodium(ctx, v, W, H, u, o, now) {
   const heights = [2.1, 1.5, 1.05];
@@ -542,22 +549,18 @@ export function drawPodium(ctx, v, W, H, u, o, now) {
     }
     // the character stands on it and bounces
     if (grow > 0.98) {
-      const t = o.age - (2 - idx) * 0.35 - 0.5;
       const hop = idx === 0 ? Math.abs(Math.sin(now * 5)) * 0.35 : Math.abs(Math.sin(now * 3.2 + idx)) * 0.12;
       const c = { x, y: heights[idx] + hop, ci: r.ci, bot: r.bot, seed: r.ci + (r.bot ? 3 : 0), head: r.head, name: r.name, o: hop < 0.02 ? 1 : 0, face: 1, run: 0, sq: hop < 0.03 ? -0.08 : 0.06, you: false, scale: 1.25 };
       drawChar(ctx, v, c, now);
-      if (idx === 0) crown(ctx, v, x, heights[idx] + hop + 1.85, v.S);
-      void t;
+      if (idx === 0) crown(ctx, v, x, heights[idx] + hop + (r.bot ? 2.3 : 2.0), v.S);
     }
   }
   // "You: 4th"
   const me = o.ranked.findIndex((r) => r.id === o.you);
-  const y = Math.max(...heights) + 2.8;
   if (me > 2) {
     const text = `YOU: ${ordinal(o.ranked[me].place)}`;
     label(ctx, text, W / 2, v.py(-0.55), Math.max(28, v.S * 0.55), { fill: '#6dff9a' });
   }
-  void y;
   // fun awards
   const chips = [];
   if (o.awards.hotFeet) chips.push({ kind: 'flame', title: 'HOT FEET', name: o.awards.hotFeet });

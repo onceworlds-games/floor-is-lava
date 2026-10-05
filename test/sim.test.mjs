@@ -143,7 +143,7 @@ test('a trampoline throws you about 5 units up and never lets you stand on it', 
   assert.ok(apex - 1.0 > 4.7 && apex - 1.0 < 5.3, `bounce rise ${apex - 1.0}`);
 });
 
-test('a pillow wobbles for 0.6 s once stood on, falls for 4 s, then is back', () => {
+test('a pillow wobbles for 0.6 s once stood on, falls, and is back 4 s after it was stood on', () => {
   const w = worldOf([{ kind: 'crumble', f: 'pillows', x: 7, y: 2, w: 2 }]);
   const b = makeBody(7, 2);
   assert.equal(crumbleState(w, 1, 0), 0);
@@ -153,9 +153,9 @@ test('a pillow wobbles for 0.6 s once stood on, falls for 4 s, then is back', ()
   assert.ok(isSolid(w, 1, 10.5));
   assert.equal(crumbleState(w, 1, 10.7), 2);
   assert.ok(!isSolid(w, 1, 10.7));
-  assert.equal(crumbleState(w, 1, 14.5), 2);
-  assert.equal(crumbleState(w, 1, 14.7), 0, 'back after about 4.6 s');
-  assert.ok(isSolid(w, 1, 14.7));
+  assert.equal(crumbleState(w, 1, 13.9), 2);
+  assert.equal(crumbleState(w, 1, 14.1), 0, 'back 4 s after it was stood on');
+  assert.ok(isSolid(w, 1, 14.1));
   // standing on it when it falls: you fall
   const b2 = makeBody(7, 2);
   const w2 = worldOf([{ kind: 'crumble', f: 'pillows', x: 7, y: 2, w: 2 }]);
