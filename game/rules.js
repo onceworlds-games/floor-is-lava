@@ -50,6 +50,17 @@ export function lavaLevel(base, t) {
   return (base * (Math.exp(LAVA_GROWTH * s) - 1)) / LAVA_GROWTH;
 }
 
+/** Once every person in the round is safe or out, the lava surges this many times faster (from round time `ff`) so nobody waits long for the bots. */
+export const SURGE = 3;
+export const SURGE_DELAY_S = 1;
+
+/** The lava's height at round time `t` when a surge began at `ff` (omitted or negative: no surge). */
+export function lavaAt(base, t, ff) {
+  if (!(ff >= 0) || t <= ff) return lavaLevel(base, t);
+  const a = lavaLevel(base, ff);
+  return a + SURGE * (lavaLevel(base, t) - a);
+}
+
 export function lavaSpeed(base, t) {
   if (t < GRACE_S) return 0;
   return base * Math.exp(LAVA_GROWTH * (t - GRACE_S));
@@ -217,9 +228,10 @@ export function roundOrder(r, ids) {
   return [...safe, ...out, ...rest];
 }
 
+/** Points by place in the round: the safe by arrival, then the burned by height (10, 7, 5, 4, 3, 2, then 1 for everyone after). */
 export function roundPoints(r, ids) {
   const pts = Object.fromEntries(ids.map((id) => [id, 0]));
-  r.safe.filter((id) => id in pts).forEach((id, i) => (pts[id] = arrivalPoints(i)));
+  roundOrder(r, ids).forEach((id, i) => (pts[id] = arrivalPoints(i)));
   return pts;
 }
 

@@ -5,7 +5,7 @@ import { RoundCtx } from '../game/round.js';
 import { analyze } from '../game/tower.js';
 import { makeWorld } from '../game/sim.js';
 import { BotRunner, SKILLS } from '../game/bots.js';
-import { PHYS, T, GRACE_S, lavaLevel, spawnX, finalRanking, arrivalPoints } from '../game/rules.js';
+import { PHYS, T, GRACE_S, lavaAt, spawnX, finalRanking, arrivalPoints } from '../game/rules.js';
 
 /** Just enough of a platform room for the host's page: the clock, shared state, players, the match. */
 class FakeRoom {
@@ -76,7 +76,7 @@ class Person {
     const pl = this.room.players.get(this.id);
     pl.presence = { x: bot.body.x, y: bot.body.y, r: g.round, m: bot.body.maxY, s: bot.st };
     if (this.done) return;
-    const ev = this.runner.step(t, PHYS.dt, lavaLevel(ctx.base, t));
+    const ev = this.runner.step(t, PHYS.dt, lavaAt(ctx.base, t, g.ff));
     for (const e of ev) {
       this.done = true;
       this.send(e.kind === 'safe' ? 'safe' : 'lava', e.h);
@@ -215,36 +215,43 @@ test('a player who goes quiet is caught by the lava; the round does not wait for
   const g = readG(room);
   assert.equal(g.phase, 'final');
   assert.ok(Object.prototype.hasOwnProperty.call(g.out, 'bob'), 'bob never said a word and the lava took him');
-  assert.equal(g.scores.bob, 0);
+  assert.ok(g.scores.bob >= 1, 'a burned player still scores by place');
   assert.ok(g.safe.includes('alice'));
   assert.ok(phases.includes('1:fly'));
 });
 
-test('once every person is safe or out, the balloon goes 3 s later and the bots left behind are ranked by height', () => {
+test('once every person is safe or out the lava surges, so the bots do not keep anyone waiting', () => {
   const room = new FakeRoom({ ids: ['alice'], hostId: 'alice', rounds: 1 });
   const game = makeGame(room);
   const host = new Host(room, game);
   host.adopt();
   room.clock = 1600;
   host.tick();
-  const g0 = readG(room);
+  assert.equal(readG(room).ff, -1, 'no surge yet');
   room.players.get('alice').presence = { x: 7, y: 87, r: 1, m: 87 };
   room.clock = 3000;
   host.claimSafe('alice', room.clock, room.matchNow());
   room.clock += 400;
   host.tick();
-  assert.equal(readG(room).phase, 'play');
-  assert.deepEqual(readG(room).safe, ['alice']);
+  const g = readG(room);
+  assert.equal(g.phase, 'play');
+  assert.deepEqual(g.safe, ['alice']);
+  assert.ok(g.ff > (room.matchNow() - g.t0) / 1000, 'the surge is a moment away');
+  const ff = g.ff;
   room.clock += 2000;
   host.tick();
-  assert.equal(readG(room).phase, 'play', 'not yet');
-  room.clock += 1200;
-  host.tick();
+  assert.equal(readG(room).ff, ff, 'set once');
+  assert.equal(readG(room).phase, 'play', 'the bots are still in it');
+});
+
+test('with a surge the bots left behind burn or arrive soon after the last person, and the round ends well before the lava reaches the top', () => {
+  const { room, phases } = play({ ids: ['alice'], hostId: 'alice', rounds: 1, people: { alice: SKILLS.ace } });
   const g = readG(room);
-  assert.equal(g.phase, 'fly');
-  assert.equal(Object.keys(g.out).length, 5, 'the five bots left behind are all accounted for');
-  assert.ok(g.until > room.matchNow());
-  void g0;
+  assert.ok(g.ff > 0 && g.ff < 45, `the surge began at ${g.ff}`);
+  assert.equal(Object.keys(g.out).length + g.safe.length, 6, 'everybody is accounted for');
+  assert.equal(g.safe[0], 'alice');
+  assert.ok(phases.includes('1:fly'));
+  assert.ok((g.te - g.t0) / 1000 < g.ff + 40, 'the round ended soon after the surge');
 });
 
 test('a new host carries on from the room\'s copy: the same round, the bots where they were, no reset', () => {

@@ -27,11 +27,9 @@ test('a whole match of bots only, 20 seeds: it ends, ranks everyone, nobody leav
     for (const id of m.ids) assert.equal(m.scores[id], m.results.reduce((s, r) => s + r.pts[id], 0));
     // sorted best first
     for (let k = 1; k < 6; k++) assert.ok(m.scores[m.ranking[k - 1]] >= m.scores[m.ranking[k]]);
-    // every round: the safe ones took 10, 7, 5, 4, 3, 2 in order, everyone else nothing
+    // every round: places take 10, 7, 5, 4, 3, 2 in order, the safe first and the burned after them
     for (const r of m.results) {
-      const pts = r.order.slice(0, r.safe).map((id) => r.pts[id]);
-      assert.deepEqual(pts, Array.from({ length: r.safe }, (_, k) => arrivalPoints(k)));
-      for (const id of r.order.slice(r.safe)) assert.equal(r.pts[id], 0);
+      assert.deepEqual(r.order.map((id) => r.pts[id]), Array.from({ length: 6 }, (_, k) => arrivalPoints(k)));
       assert.ok(r.end > 4 && r.end <= 160, `round length ${r.end}`);
       arrivals += r.safe;
       burned += 6 - r.safe;

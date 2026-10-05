@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   lavaLevel,
+  lavaAt,
+  SURGE,
   lavaSpeed,
   lavaReaches,
   lavaBase,
@@ -46,6 +48,21 @@ test('the lava waits under the floor, then rises and speeds up', () => {
   // 2% faster every 5 s
   assert.ok(Math.abs(lavaSpeed(0.9, GRACE_S + 5) / lavaSpeed(0.9, GRACE_S) - 1.02) < 1e-9);
   assert.equal(lavaSpeed(0.9, 1), 0);
+});
+
+test('the surge makes the lava SURGE times faster from its moment on, without a jump', () => {
+  assert.equal(lavaAt(0.9, 30, -1), lavaLevel(0.9, 30));
+  assert.equal(lavaAt(0.9, 30, undefined), lavaLevel(0.9, 30));
+  assert.equal(lavaAt(0.9, 20, 25), lavaLevel(0.9, 20), 'nothing changes before it');
+  assert.ok(Math.abs(lavaAt(0.9, 25, 25) - lavaLevel(0.9, 25)) < 1e-12, 'continuous');
+  const rise = lavaAt(0.9, 28, 25) - lavaAt(0.9, 25, 25);
+  assert.ok(Math.abs(rise / (lavaLevel(0.9, 28) - lavaLevel(0.9, 25)) - SURGE) < 1e-9);
+  let prev = -Infinity;
+  for (let t = 0; t < 100; t += 0.5) {
+    const l = lavaAt(0.9, t, 30);
+    assert.ok(l >= prev);
+    prev = l;
+  }
 });
 
 test('lavaReaches inverts lavaLevel', () => {
@@ -96,7 +113,7 @@ test('a round: safe players in arrival order, the burned by height, once each', 
   assert.equal(roundDone(r, ids), true);
   // c, e arrived (in that order); then d (30), then a and b tie at 12.5: the earlier seat first
   assert.deepEqual(roundOrder(r, ids), ['c', 'e', 'd', 'a', 'b']);
-  assert.deepEqual(roundPoints(r, ids), { a: 0, b: 0, c: 10, d: 0, e: 7 });
+  assert.deepEqual(roundPoints(r, ids), { a: 4, b: 3, c: 10, d: 5, e: 7 }, 'points by place: the burned follow the safe');
 });
 
 test('bad heights never break the order', () => {
@@ -110,11 +127,11 @@ test('bad heights never break the order', () => {
   assert.deepEqual(roundOrder(r, ['a', 'b', 'c']), ['a', 'b', 'c']);
 });
 
-test('unresolved players are ranked last and score nothing', () => {
+test('unresolved players are ranked last', () => {
   const r = newRecord();
   applySafe(r, 'x');
   assert.deepEqual(roundOrder(r, ['p', 'x', 'q']), ['x', 'p', 'q']);
-  assert.deepEqual(roundPoints(r, ['p', 'x', 'q']), { p: 0, x: 10, q: 0 });
+  assert.deepEqual(roundPoints(r, ['p', 'x', 'q']), { p: 7, x: 10, q: 5 });
   // ids not in the roster are ignored
   const r2 = newRecord();
   applySafe(r2, 'ghost');

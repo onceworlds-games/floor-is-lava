@@ -1,37 +1,22 @@
 {
-  "slug": "watchlight",
-  "name": "Watchlight",
-  "description": "Keep the lighthouse burning through the storm. Guide ships home and drive back what rises from the sea.",
-  "dir": "dist",
+  "slug": "floor-is-lava",
+  "name": "The Floor Is Lava",
+  "description": "The floor is lava and it's rising! Climb the furniture to the top before it gets you.",
+  "dir": "game",
   "productionBranch": "main",
-  "genre": "Survival",
+  "genre": "Party",
   "icon": "store/icon.png",
-  "thumbnails": ["store/thumb-1.png", "store/thumb-2.png", "store/thumb-3.png", "store/thumb-4.png"],
+  "thumbnails": ["store/thumb-1.png", "store/thumb-2.png", "store/thumb-3.png"],
   "controls": [
-    { "keys": ["Mouse", "Drag"], "action": "Aim the lamp on the water" },
-    { "keys": ["Wheel", "+", "-"], "action": "Focus the pool" },
-    { "keys": ["Space"], "action": "Sweep or Spot" },
-    { "keys": ["1", "2", "3", "4"], "action": "Lens: White, Amber, Blue, Red" },
-    { "keys": ["Shift", "Ctrl"], "action": "Strobe, overcharge (hold)" },
-    { "keys": ["Click", "F"], "action": "Harpoon, flare (gallery)" },
-    { "keys": ["Z", "E"], "action": "Scan, repair (hold)" },
-    { "keys": ["R", "H"], "action": "Radio, foghorn (watch room)" },
-    { "keys": ["G", "Q"], "action": "Generator, hand crank" },
-    { "keys": ["C", "O", "P"], "action": "Chart, oil can, pet the cat" },
-    { "keys": ["Tab", "Shift+1-4"], "action": "Change station" },
-    { "keys": ["A", "D", "W", "S"], "action": "Look around" }
+    { "keys": ["A", "D"], "action": "Run" },
+    { "keys": ["Left", "Right"], "action": "Run" },
+    { "keys": ["Space", "W", "Up"], "action": "Jump (hold to jump higher)" },
+    { "keys": ["S", "Down"], "action": "Drop through furniture" }
   ],
   "badges": [
-    { "id": "first-light", "name": "First Light", "description": "Keep the lamp through night one.", "icon": "store/badges/first-light.png" },
-    { "id": "safe-harbour", "name": "Safe Harbour", "description": "Ten ships home in one night.", "icon": "store/badges/safe-harbour.png" },
-    { "id": "no-wrecks", "name": "No Wrecks", "description": "A night with nothing on the reef.", "icon": "store/badges/no-wrecks.png" },
-    { "id": "out-of-oil", "name": "Out Of Oil", "description": "Finish a night on the crank and a dry wick.", "icon": "store/badges/out-of-oil.png" },
-    { "id": "siren-song", "name": "Siren Song", "description": "Silence five sirens with Amber.", "icon": "store/badges/siren-song.png" },
-    { "id": "false-lights", "name": "False Lights", "description": "Reveal five mimics.", "icon": "store/badges/false-lights.png" },
-    { "id": "lightning-rod", "name": "Lightning Rod", "description": "Take a strike and keep the lamp lit to dawn.", "icon": "store/badges/lightning-rod.png" },
-    { "id": "titan-down", "name": "Titan Down", "description": "Put the Tide Titan under.", "icon": "store/badges/titan-down.png" },
-    { "id": "twelve-nights", "name": "Twelve Nights", "description": "Keep a whole season.", "icon": "store/badges/twelve-nights.png" },
-    { "id": "storm-six", "name": "Storm Six", "description": "Keep a season at Storm 6.", "icon": "store/badges/storm-six.png" },
-    { "id": "good-cat", "name": "Good Cat", "description": "Pet the cat ten times.", "icon": "store/badges/good-cat.png" }
+    { "id": "first-win", "name": "First Win", "description": "Win a match.", "icon": "store/badge-first-win.png" },
+    { "id": "hot-feet", "name": "Hot Feet", "description": "Reach the top with the lava less than 2 units below you.", "icon": "store/badge-hot-feet.png" },
+    { "id": "first-up", "name": "First Up", "description": "Be the first to the top in a round.", "icon": "store/badge-first-up.png" },
+    { "id": "climber", "name": "Climber", "description": "Reach the top 10 times.", "icon": "store/badge-climber.png" }
   ]
 }
