@@ -58,7 +58,7 @@ export class Host {
     this.room = room;
     this.game = game;
     this.claims = []; // arrivals and burns waiting to be ordered: { kind, id, at, ms, h }
-        this.lastBots = -1e9;
+    this.lastBots = -1e9;
     this.lastEnd = -1e9;
   }
 

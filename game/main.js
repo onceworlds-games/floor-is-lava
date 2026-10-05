@@ -985,7 +985,7 @@ async function boot() {
       if (g.ff >= 0) ui.drawSurge(ctx, W, H, u, tk - g.ff, fx.reduced);
     }
     if (g.phase === 'banner' || g.phase === 'play' || g.phase === 'fly') {
-      const bottom = ui.drawHud(ctx, W, H, u, { round: g.round, total: g.n, left, score: g.scores[myId] ?? 0 });
+      const bottom = ui.drawHud(ctx, W, H, u, { round: g.round, total: g.n, left, score: g.scores[myId] ?? 0, dy: room.spectating ? 50 : 0 });
       ui.drawHeightBar(ctx, W, H, u, { goalY: world.goalY, lava: L, entries: barEntries });
       if (room.spectating) ui.drawWatching(ctx, W, H, u, bottom + 8);
       else if (m && m.st === 2 && m.hot <= 0) ui.drawGhostChip(ctx, W, H, u, bottom + 8);

@@ -336,7 +336,8 @@ export function drawHud(ctx, W, H, u, o) {
   const cw = clamp(190 * u, 130, 250);
   const ch = Math.max(54, 62 * u);
   const x = W / 2 - cw / 2;
-  const y0 = W >= 600 ? 8 : 64; // the platform's buttons sit in the top left: a narrow screen starts below them
+  // the platform's buttons sit in the top left (a narrow screen starts below them) and its "Watching" note in the top middle
+  const y0 = (W >= 600 ? 8 : 64) + (o.dy ?? 0);
   plate(ctx, x, y0, cw, ch, '#3d2b52', ch * 0.28, 4);
   label(ctx, o.total > 1 ? `ROUND ${o.round}/${o.total}` : 'ROUND', W / 2, y0 + ch * 0.34, Math.max(18, 28 * u));
   label(ctx, o.left === 1 ? '1 left' : `${o.left} left`, W / 2, y0 + ch * 0.74, Math.max(15, 22 * u), { fill: '#cbb8ea', lw: 3 });

@@ -52,10 +52,10 @@ export function canJumpLoose(a, b) {
 // ------------------------------------------------------------------ furniture
 const STATIC_FUR = [
   // f, [minW, maxW], weights in the [low, middle, high] zones
-  { f: 'couch', w: [3.0, 4.2], z: [3, 1, 0] },
-  { f: 'armchair', w: [2.0, 2.6], z: [2, 2, 1] },
-  { f: 'table', w: [2.2, 3.2], z: [2, 2, 1] },
-  { f: 'shelf', w: [2.6, 3.8], z: [1, 3, 2] },
+  { f: 'couch', w: [2.8, 3.8], z: [3, 1, 0] },
+  { f: 'armchair', w: [1.9, 2.5], z: [2, 2, 1] },
+  { f: 'table', w: [2.0, 2.9], z: [2, 2, 1] },
+  { f: 'shelf', w: [2.4, 3.4], z: [1, 3, 2] },
   { f: 'toybox', w: [1.5, 2.1], z: [1, 2, 2] },
   { f: 'fridge', w: [1.4, 1.7], z: [0, 1, 2] },
   { f: 'lamp', w: [1.0, 1.3], z: [0, 1, 3] },
@@ -101,7 +101,7 @@ function buildRows(seed, W, lobby, goal = TOWER_GOAL) {
   const topY = lobby ? 11.2 : goal - GOAL_RISE;
   const N = rowCount(lobby, goal);
   const raw = [];
-  for (let k = 0; k < N; k++) raw.push(lerp(1.35, 1.75, (k + 0.5) / N) * (1 + rnd(-0.06, 0.06)));
+  for (let k = 0; k < N; k++) raw.push(lerp(1.5, 1.8, (k + 0.5) / N) * (1 + rnd(-0.06, 0.06)));
   const scale = topY / raw.reduce((s, v) => s + v, 0);
   const rowY = [];
   let acc = 0;
@@ -162,13 +162,14 @@ function buildRows(seed, W, lobby, goal = TOWER_GOAL) {
         const wanted = names[Math.floor(rng() * 3)];
         const fur = STATIC_FUR.find((s) => s.f === wanted);
         const piece = makeStatic(fur, 0, Math.round((ny + rnd(-0.05, 0.05)) * 100) / 100);
-        piece.w = clamp(piece.w * 0.9, 2.4, 3.6);
+        piece.w = clamp(piece.w * 0.9, 2.4, 3.3);
         piece.x = clamp(Math.round((xs[j] + rnd(-0.3, 0.3)) * 20) / 20, piece.w / 2 + 0.2, W - piece.w / 2 - 0.2);
         piece.row = 0;
         row.push(piece);
       }
     } else {
-      const count = last ? 1 : zone === 0 ? 3 : zone === 1 ? (rng() < 0.55 ? 2 : 3) : rng() < 0.65 ? 2 : 1;
+      const roll = rng();
+      const count = last ? 1 : zone === 0 ? (roll < 0.7 ? 2 : 3) : zone === 1 ? (roll < 0.65 ? 2 : roll < 0.85 ? 3 : 1) : roll < 0.55 ? 2 : 1;
       for (let j = 0; j < count; j++) {
         const fur = pickWeighted(STATIC_FUR, (s) => s.z[zone] + 0.001);
         place(makeStatic(fur, prog, ny, last), prevStatic, 18);
@@ -217,7 +218,7 @@ function buildRows(seed, W, lobby, goal = TOWER_GOAL) {
 
 function rowCount(lobby, goal) {
   if (lobby) return 7;
-  return goal === TOWER_GOAL ? 54 : Math.max(4, Math.round((goal - GOAL_RISE) / 1.6));
+  return goal === TOWER_GOAL ? 52 : Math.max(4, Math.round((goal - GOAL_RISE) / 1.65));
 }
 
 function buildLadder(W, lobby, goal = TOWER_GOAL) {

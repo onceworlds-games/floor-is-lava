@@ -2,7 +2,7 @@
 // poster's exact size (one CSS pixel per canvas pixel), draws ONE staged, frozen frame with the real renderer and sets
 // `document.body.dataset.ready = '1'`. Everything is fixed (seeds, positions), so the same poster comes out every time.
 
-import { PLAYER_COLORS, TAU } from './rules.js';
+import { TAU } from './rules.js';
 import { generateTower } from './tower.js';
 import { makeWorld } from './sim.js';
 import { Fx, popupLook } from './fx.js';

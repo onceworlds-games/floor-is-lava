@@ -4,7 +4,7 @@
 // a pause on shaky pieces and a late start, so the best bots nearly always make it and the weak ones get caught.
 
 import { PHYS, T, mulberry32, hash2, hashStr, clamp } from './rules.js';
-import { makeBody, copyBody, stepBody, stepGhost, reachedGoal, platformX, standingOn } from './sim.js';
+import { makeBody, copyBody, stepBody, stepGhost, reachedGoal, platformX, standingOn, EV_BOUNCE } from './sim.js';
 import { maxRiseOf } from './tower.js';
 
 const DT = PHYS.dt;
@@ -17,8 +17,8 @@ const DT = PHYS.dt;
 export const SKILLS = {
   ace: { react: 2, miss: 0, execNoise: 0, hes: 0, idle: 0, idleMax: 0, panic: 3, startDelay: 0 },
   sharp: { react: 8, miss: 0.04, execNoise: 0.12, hes: 10, idle: 0.3, idleMax: 50, panic: 3, startDelay: 0.4 },
-  avg: { react: 14, miss: 0.08, execNoise: 0.3, hes: 18, idle: 0.9, idleMax: 110, panic: 1.0, startDelay: 1.0 },
-  weak: { react: 24, miss: 0.12, execNoise: 0.45, hes: 28, idle: 0.9, idleMax: 150, panic: 0.8, startDelay: 1.6 },
+  avg: { react: 14, miss: 0.08, execNoise: 0.3, hes: 18, idle: 0.9, idleMax: 125, panic: 1.0, startDelay: 1.0 },
+  weak: { react: 24, miss: 0.12, execNoise: 0.45, hes: 28, idle: 0.9, idleMax: 165, panic: 0.8, startDelay: 1.6 },
 };
 
 /** A skill for one bot, from its seed: a mix of sharp, average and weak, each a little different. */
@@ -57,6 +57,7 @@ export function makeBrain(seed, sk) {
     hold: 999,
     hesUntil: 0,
     idleUntil: 0,
+    bounces: 0, // trampoline bounces since it last stood on something: one is a shortcut, a second would be a loop
   };
 }
 
@@ -224,7 +225,7 @@ function inAir(world, an, b, br, t, danger, react, out) {
       // the same aim as when it was chosen (a rolling chair's moves with it)
       const xl = P[plan.q].kind === 'move' ? landX(P[plan.q], b.x, t) : plan.xl;
       const land = evalPolicy(world, b, xl, t, false);
-      if (land >= 0 && an.rank[land] < br.rankA) plan = br.plan = { xl, q: plan.q };
+      if (land >= 0 && an.rank[land] < br.rankA && !(br.bounces > 0 && P[plan.q].kind === 'bounce')) plan = br.plan = { xl, q: plan.q };
       else plan = br.plan = null;
     }
     if (!plan) plan = br.plan = chooseAirTarget(world, an, b, br, t);
@@ -242,7 +243,7 @@ function chooseAirTarget(world, an, b, br, t) {
   for (let i = 0; i < P.length; i++) {
     const q = P[i];
     const dx = Math.abs(platformX(q, t + 0.4) - b.x) - q.w / 2;
-    if (dx > 6) continue;
+    if (dx > 6 || (q.kind === 'bounce' && br.bounces > 0)) continue;
     if (an.rank[i] < br.rankA && q.y > b.y - 1 && q.y < b.y + 5.2) progress.push({ i, key: an.rank[i] * 100 + Math.max(0, dx) });
     else if (q.kind !== 'bounce' && q.y < b.y - 0.2 && q.y > b.y - 9 && dx < 5) below.push({ i, key: -q.y * 10 + Math.max(0, dx) });
   }
@@ -297,6 +298,8 @@ export class BotRunner {
       if (bot.st === 0) {
         brainInput(world, this.an, b, bot.brain, t, L, BOT_INPUT);
         stepBody(world, b, BOT_INPUT, dt, t, true);
+        if (b.ev & EV_BOUNCE) bot.brain.bounces++;
+        else if (b.on) bot.brain.bounces = 0;
         b.ev = 0;
         b.impact = 0;
         if (reachedGoal(world, b)) {
