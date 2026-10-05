@@ -76,7 +76,7 @@ function bubbles(fx, level, x0, x1, n) {
 function cover(ctx, fx, W, H) {
   const tower = generateTower(21, { width: 24, height: 14.5 });
   const world = makeWorld(tower, { floorUntil: 4 });
-  const v = viewFor(W, H, 31, 4.7, -1.8);
+  const v = viewFor(W, H, 31, 3.6, -1.8);
   const t = 20;
   const L = 0.45;
   drawWorldBack(ctx, v, world, t, 1.3, 0);
@@ -118,8 +118,8 @@ function cover(ctx, fx, W, H) {
   drawLava(ctx, v, L, 1.3);
   fx.draw(ctx, v);
   // the name, big, over the dark curtain on the left
-  label(ctx, 'THE FLOOR IS', 350, 96, 84);
-  bigText(ctx, 'LAVA', 350, 252, 250, '#ffb020', '#c8321a');
+  label(ctx, 'THE FLOOR IS', 285, 92, 78);
+  bigText(ctx, 'LAVA', 285, 240, 228, '#ffb020', '#c8321a');
 }
 
 // ------------------------------------------------------------------ action: a leap from a couch to a bookshelf, the lava just below
@@ -164,7 +164,7 @@ function win(ctx, fx, W, H) {
   const world = makeWorld(tower, { floorUntil: 4 });
   const dy = 5;
   const goal = world.platforms[world.goal];
-  const v = viewFor(W, H, 52, goal.x, goal.y - 1.8);
+  const v = viewFor(W, H, 52, goal.x, goal.y - 1.95);
   drawWorldBack(ctx, v, world, 30, 3.1, dy);
   const cast = [3, 0, 1, 5, 2, 4, 6, 8];
   const list = cast.map((ci, slot) => {
